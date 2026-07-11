@@ -16,3 +16,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 "$ROOT/harness/run_case.sh" changes default
 "$ROOT/harness/run_case.sh" changes max3
 "$ROOT/harness/run_case.sh" refcount default
+"$ROOT/harness/run_case.sh" save overwrite
+"$ROOT/harness/run_case.sh" save append
+"$ROOT/harness/run_case.sh" save crlf
+"$ROOT/harness/run_case.sh" save backlink

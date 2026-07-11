@@ -16,6 +16,7 @@ query_string=""
 request_method="GET"
 server_software="Apache"
 stdin_body=""
+snapshot_pages=()
 
 configure_case() {
   case "$script_name:$case_name" in
@@ -58,6 +59,30 @@ configure_case() {
       ;;
     refcount:default)
       ;;
+    save:overwrite)
+      query_string="SaveOverwrite"
+      request_method="POST"
+      stdin_body="Text=Line+One&mode=edit"
+      snapshot_pages=("SaveOverwrite")
+      ;;
+    save:append)
+      query_string="GuestBook"
+      request_method="POST"
+      stdin_body="Text=Appended+note&mode=append"
+      snapshot_pages=("GuestBook")
+      ;;
+    save:crlf)
+      query_string="SaveCrlf"
+      request_method="POST"
+      stdin_body="Text=Line1%0D%0ALine2&mode=edit"
+      snapshot_pages=("SaveCrlf")
+      ;;
+    save:backlink)
+      query_string="SaveBacklink"
+      request_method="POST"
+      stdin_body="Text=Before+%3C%3CMainTopic+After&mode=edit"
+      snapshot_pages=("SaveBacklink" "MainTopic")
+      ;;
     *)
       echo "unknown case: $script_name:$case_name" >&2
       exit 1
@@ -99,7 +124,7 @@ prepare_workspace() {
     touch -t 202401010101 "$tmpdir/pages/WhosWho"
   fi
 
-  workspace_tmpdir="$tmpdir"
+  printf '%s\n' "$tmpdir"
 }
 
 run_case() {
@@ -107,30 +132,47 @@ run_case() {
   local script_path="$2"
   local output_path="$3"
   local content_length
+  local workspace_tmpdir
+  local snapshot_dir="$4"
 
   mkdir -p "$(dirname "$output_path")"
+  mkdir -p "$snapshot_dir"
   content_length="${#stdin_body}"
+  workspace_tmpdir="$(prepare_workspace)"
 
   (
     cd "$workspace_tmpdir"
     printf '%s' "$stdin_body" | env -i \
       PATH="$PATH" \
+      PERL_USE_UNSAFE_INC=1 \
       QUERY_STRING="$query_string" \
       REQUEST_METHOD="$request_method" \
       CONTENT_LENGTH="$content_length" \
       SERVER_SOFTWARE="$server_software" \
       "$interpreter" "$script_path" > "$output_path"
   )
+
+  for page in "${snapshot_pages[@]}"; do
+    if [[ -f "$workspace_tmpdir/pages/$page" ]]; then
+      cp "$workspace_tmpdir/pages/$page" "$snapshot_dir/$page"
+    fi
+  done
+
+  rm -rf "$workspace_tmpdir"
 }
 
 configure_case
-prepare_workspace
-trap 'rm -rf "$workspace_tmpdir"' EXIT
 
 perl_output="$HARNESS_DIR/perl/$script_name/$case_name.html"
 ruby_output="$HARNESS_DIR/ruby/$script_name/$case_name.html"
+perl_snapshot_dir="$HARNESS_DIR/perl/$script_name/$case_name.pages"
+ruby_snapshot_dir="$HARNESS_DIR/ruby/$script_name/$case_name.pages"
 
-run_case perl "./$script_name.cgi" "$perl_output"
-run_case ruby "./$script_name.rb.cgi" "$ruby_output"
+run_case perl "./$script_name.cgi" "$perl_output" "$perl_snapshot_dir"
+run_case ruby "./$script_name.rb.cgi" "$ruby_output" "$ruby_snapshot_dir"
 
 git diff --no-index -- "$perl_output" "$ruby_output"
+
+for page in "${snapshot_pages[@]}"; do
+  git diff --no-index -- "$perl_snapshot_dir/$page" "$ruby_snapshot_dir/$page"
+done
