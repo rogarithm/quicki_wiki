@@ -56,6 +56,8 @@ configure_case() {
     changes:max3)
       query_string="max=3"
       ;;
+    refcount:default)
+      ;;
     *)
       echo "unknown case: $script_name:$case_name" >&2
       exit 1

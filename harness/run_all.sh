@@ -15,3 +15,4 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 "$ROOT/harness/run_case.sh" search special
 "$ROOT/harness/run_case.sh" changes default
 "$ROOT/harness/run_case.sh" changes max3
+"$ROOT/harness/run_case.sh" refcount default
