@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 
 $stdout.sync = true
-print "Content-type: text/html\n\n"
+print "Content-type: text/html; charset=UTF-8\n\n"
 
 def mdy(time)
   "#{MONTHS[time.month - 1]} #{time.day}, #{time.year}"

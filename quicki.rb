@@ -107,7 +107,7 @@ end
 
 def normalize_cgi_response(output)
   headers, body = output.split(/\r?\n\r?\n/, 2)
-  return http_response("200 OK", { "Content-Type" => "text/html" }, output) if body.nil?
+  return http_response("200 OK", { "Content-Type" => "text/html; charset=UTF-8" }, output) if body.nil?
 
   status = "200 OK"
   header_hash = {}
@@ -137,15 +137,15 @@ def serve_static(path)
 end
 
 def not_found
-  http_response("404 Not Found", { "Content-Type" => "text/plain" }, "Not Found\n")
+  http_response("404 Not Found", { "Content-Type" => "text/plain; charset=UTF-8" }, "Not Found\n")
 end
 
 def method_not_allowed
-  http_response("405 Method Not Allowed", { "Content-Type" => "text/plain" }, "Method Not Allowed\n")
+  http_response("405 Method Not Allowed", { "Content-Type" => "text/plain; charset=UTF-8" }, "Method Not Allowed\n")
 end
 
 def server_error(message)
-  http_response("500 Internal Server Error", { "Content-Type" => "text/plain" }, message)
+  http_response("500 Internal Server Error", { "Content-Type" => "text/plain; charset=UTF-8" }, message)
 end
 
 def http_response(status, headers, body)

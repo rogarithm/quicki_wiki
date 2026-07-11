@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 
 $stdout.sync = true
-print "Content-type: text/html\n\n"
+print "Content-type: text/html; charset=UTF-8\n\n"
 
 MARK = "\263".b
 LINK = /[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]+)+/
