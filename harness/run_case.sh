@@ -51,6 +51,11 @@ configure_case() {
     search:special)
       query_string="search=wiki.org%2F"
       ;;
+    changes:default)
+      ;;
+    changes:max3)
+      query_string="max=3"
+      ;;
     *)
       echo "unknown case: $script_name:$case_name" >&2
       exit 1
@@ -74,6 +79,23 @@ prepare_workspace() {
   find "$tmpdir/pages" -type f | while IFS= read -r page; do
     touch -t 202401010101 "$page"
   done
+
+  if [[ "$script_name" == "changes" ]]; then
+    touch -t 202401140101 "$tmpdir/pages/WelcomeVisitors"
+    touch -t 202401130101 "$tmpdir/pages/WikiEdit"
+    touch -t 202401120101 "$tmpdir/pages/MixedMarkup"
+    touch -t 202401110101 "$tmpdir/pages/MainTopic"
+    touch -t 202401100101 "$tmpdir/pages/GuestBook"
+    touch -t 202401090101 "$tmpdir/pages/TopicSearch"
+    touch -t 202401080101 "$tmpdir/pages/SearchSymbols"
+    touch -t 202401070101 "$tmpdir/pages/WikiSignature"
+    touch -t 202401060101 "$tmpdir/pages/WikiSandbox"
+    touch -t 202401050101 "$tmpdir/pages/StyleGuide"
+    touch -t 202401040101 "$tmpdir/pages/LegalNotice"
+    touch -t 202401030101 "$tmpdir/pages/FindPage"
+    touch -t 202401020101 "$tmpdir/pages/WikiWord"
+    touch -t 202401010101 "$tmpdir/pages/WhosWho"
+  fi
 
   workspace_tmpdir="$tmpdir"
 }
