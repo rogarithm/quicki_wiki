@@ -42,6 +42,15 @@ configure_case() {
       request_method="POST"
       stdin_body="append=1"
       ;;
+    search:hit)
+      query_string="search=Wiki"
+      ;;
+    search:none)
+      query_string="search=NoSuchNeedle"
+      ;;
+    search:special)
+      query_string="search=wiki.org%2F"
+      ;;
     *)
       echo "unknown case: $script_name:$case_name" >&2
       exit 1

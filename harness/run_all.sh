@@ -10,3 +10,6 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 "$ROOT/harness/run_case.sh" edit new
 "$ROOT/harness/run_case.sh" edit existing
 "$ROOT/harness/run_case.sh" edit append
+"$ROOT/harness/run_case.sh" search hit
+"$ROOT/harness/run_case.sh" search none
+"$ROOT/harness/run_case.sh" search special
