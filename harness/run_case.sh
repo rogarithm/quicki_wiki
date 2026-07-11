@@ -31,6 +31,17 @@ configure_case() {
     wiki:mixed)
       query_string="MixedMarkup"
       ;;
+    edit:new)
+      query_string="MissingPage"
+      ;;
+    edit:existing)
+      query_string="WelcomeVisitors"
+      ;;
+    edit:append)
+      query_string="GuestBook"
+      request_method="POST"
+      stdin_body="append=1"
+      ;;
     *)
       echo "unknown case: $script_name:$case_name" >&2
       exit 1
@@ -44,8 +55,7 @@ prepare_workspace() {
   cp "$ROOT/template.html" "$tmpdir/template.html"
   cp "$ROOT/logo.gif" "$tmpdir/logo.gif"
   cp "$ROOT/logo_globe.gif" "$tmpdir/logo_globe.gif"
-  cp "$ROOT/wiki.cgi" "$tmpdir/wiki.cgi"
-  cp "$ROOT/wiki.rb.cgi" "$tmpdir/wiki.rb.cgi"
+  find "$ROOT" -maxdepth 1 -type f \( -name "*.cgi" -o -name "*.rb.cgi" \) -exec cp {} "$tmpdir/" \;
   cp -R "$ROOT/pages" "$tmpdir/pages"
 
   if [[ -d "$HARNESS_DIR/fixtures/pages" ]]; then
@@ -87,7 +97,7 @@ trap 'rm -rf "$workspace_tmpdir"' EXIT
 perl_output="$HARNESS_DIR/perl/$script_name/$case_name.html"
 ruby_output="$HARNESS_DIR/ruby/$script_name/$case_name.html"
 
-run_case perl ./wiki.cgi "$perl_output"
-run_case ruby ./wiki.rb.cgi "$ruby_output"
+run_case perl "./$script_name.cgi" "$perl_output"
+run_case ruby "./$script_name.rb.cgi" "$ruby_output"
 
 git diff --no-index -- "$perl_output" "$ruby_output"

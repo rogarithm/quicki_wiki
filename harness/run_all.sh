@@ -7,3 +7,6 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 "$ROOT/harness/run_case.sh" wiki existing
 "$ROOT/harness/run_case.sh" wiki missing
 "$ROOT/harness/run_case.sh" wiki mixed
+"$ROOT/harness/run_case.sh" edit new
+"$ROOT/harness/run_case.sh" edit existing
+"$ROOT/harness/run_case.sh" edit append
