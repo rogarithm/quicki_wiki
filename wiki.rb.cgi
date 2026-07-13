@@ -8,6 +8,26 @@ LINK = /[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]+)+/
 PROTOCOL = /(?:http|ftp|mailto|file|gopher|telnet|news)/
 MONTHS = %w[January February March April May June July August September October November December]
 
+module Quicki
+  class Browser
+    def extract_in_place_urls(in_place_urls, line)
+      index = 0
+
+      while line.sub!(/\b(javascript):\S.*/, "#{MARK}#{index}#{MARK}")
+        in_place_urls[index] = Regexp.last_match(0)
+        index += 1
+      end
+
+      while line.sub!(/\b#{PROTOCOL.source}:[^\s<>\[\]"'()]*[^\s<>\[\]"'(),.?]/, "#{MARK}#{index}#{MARK}")
+        in_place_urls[index] = Regexp.last_match(0)
+        index += 1
+      end
+
+      [in_place_urls, line]
+    end
+  end
+end
+
 def format_body(source)
   codes = []
   in_place_urls = []
@@ -15,17 +35,7 @@ def format_body(source)
   escaped = source.gsub("&", "&amp;").gsub("<", "&lt;").gsub(">", "&gt;")
 
   escaped.split(/\n/).each do |line|
-    index = 0
-
-    while line.sub!(/\b(javascript):\S.*/, "#{MARK}#{index}#{MARK}")
-      in_place_urls[index] = Regexp.last_match(0)
-      index += 1
-    end
-
-    while line.sub!(/\b#{PROTOCOL.source}:[^\s<>\[\]"'()]*[^\s<>\[\]"'(),.?]/, "#{MARK}#{index}#{MARK}")
-      in_place_urls[index] = Regexp.last_match(0)
-      index += 1
-    end
+    in_place_urls, line = Quicki::Browser.new.extract_in_place_urls(in_place_urls, line)
 
     code = ""
     line.sub!(/^\t+/, "")
