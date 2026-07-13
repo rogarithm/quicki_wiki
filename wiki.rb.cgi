@@ -9,21 +9,21 @@ PROTOCOL = /(?:http|ftp|mailto|file|gopher|telnet|news)/
 MONTHS = %w[January February March April May June July August September October November December]
 
 def format_body(source)
-  @code = []
+  codes = []
+  in_place_urls = []
   body = +""
   escaped = source.gsub("&", "&amp;").gsub("<", "&lt;").gsub(">", "&gt;")
 
   escaped.split(/\n/).each do |line|
     index = 0
-    @in_place_urls = []
 
     while line.sub!(/\b(javascript):\S.*/, "#{MARK}#{index}#{MARK}")
-      @in_place_urls[index] = Regexp.last_match(0)
+      in_place_urls[index] = Regexp.last_match(0)
       index += 1
     end
 
     while line.sub!(/\b#{PROTOCOL.source}:[^\s<>\[\]"'()]*[^\s<>\[\]"'(),.?]/, "#{MARK}#{index}#{MARK}")
-      @in_place_urls[index] = Regexp.last_match(0)
+      in_place_urls[index] = Regexp.last_match(0)
       index += 1
     end
 
@@ -33,43 +33,43 @@ def format_body(source)
       code = "..."
     end
     if line.match?(/^\s/)
-      body << emit_code("PRE", 1)
+      body << emit_code(codes, "PRE", 1)
       code = "PRE"
     end
     if line.sub!(/^(\*+)/, "<li>")
-      body << emit_code("UL", Regexp.last_match(1).length)
+      body << emit_code(codes, "UL", Regexp.last_match(1).length)
       code = "UL"
     end
     if line.sub!(/^(\#+)/, "<li>")
-      body << emit_code("OL", Regexp.last_match(1).length)
+      body << emit_code(codes, "OL", Regexp.last_match(1).length)
       code = "OL"
     end
     if line.sub!(/^(:+)(.+?):( +)/) { "<dt>#{$2}<dd>" }
-      body << emit_code("DL", Regexp.last_match(1).length)
+      body << emit_code(codes, "DL", Regexp.last_match(1).length)
       code = "DL"
     end
     if line.sub!(/^(\d+)\./, "<li>")
-      body << emit_code("OL", 1)
+      body << emit_code(codes, "OL", 1)
       code = "OL"
     end
     if line.sub!(/^!!!!/, "")
-      body << emit_code("H4", 1)
+      body << emit_code(codes, "H4", 1)
       code = "H4"
     end
     if line.sub!(/^!!!/, "")
-      body << emit_code("H3", 1)
+      body << emit_code(codes, "H3", 1)
       code = "H3"
     end
     if line.sub!(/^!!/, "")
-      body << emit_code("H2", 1)
+      body << emit_code(codes, "H2", 1)
       code = "H2"
     end
     if line.sub!(/^\"\"/, "")
-      body << emit_code("BLOCKQUOTE", 1)
+      body << emit_code(codes, "BLOCKQUOTE", 1)
       code = "BLOCKQUOTE"
     end
 
-    body << emit_code("", 0) if code.empty?
+    body << emit_code(codes, "", 0) if code.empty?
 
     line.sub!(/^-----*/, "<hr>")
     line.gsub!(/'''(.*?)'''/, '<strong>\1</strong>')
@@ -77,27 +77,27 @@ def format_body(source)
     line.gsub!(/\[Search\]/, "<form action=search.cgi><input type=text name=search size=40>\n   <input type=\"submit\" value=\"Search\"></form>")
     line.gsub!(LINK) { |match| as_anchor(match) }
     marker_pattern = Regexp.new("#{Regexp.escape(MARK)}(\\d+)#{Regexp.escape(MARK)}".b)
-    line.gsub!(marker_pattern) { in_place_url(Regexp.last_match(1).to_i) }
+    line.gsub!(marker_pattern) { in_place_url(in_place_urls, Regexp.last_match(1).to_i) }
 
     body << line << "\n"
   end
 
-  body << emit_code("", 0)
+  body << emit_code(codes, "", 0)
   body
 end
 
-def emit_code(code, depth)
+def emit_code(codes, code, depth)
   tags = +""
-  while @code.length > depth
-    tags << "</#{@code.pop}>\n<p>"
+  while codes.length > depth
+    tags << "</#{codes.pop}>\n<p>"
   end
-  while @code.length < depth
-    @code << code
+  while codes.length < depth
+    codes << code
     tags << "<#{code}>"
   end
-  if @code.last.to_s != code
-    tags << "</#{@code.last}>\n<#{code}>"
-    @code[-1] = code
+  if codes.last.to_s != code
+    tags << "</#{codes.last}>\n<#{code}>"
+    codes[-1] = code
   end
   tags
 end
@@ -110,21 +110,18 @@ def as_anchor(title)
   end
 end
 
-def in_place_url(index)
-  ref = @in_place_urls[index].sub(/^(javascript.{30}).*/, '\1 ...')
+def in_place_url(in_place_urls, index)
+  ref = in_place_urls[index].sub(/^(javascript.{30}).*/, '\1 ...')
   if ref.match?(/\.(gif|jpeg|jpg|png)\z/i)
     "<img src=\"#{ref}\">"
   else
-    "<a href=\"#{@in_place_urls[index]}\">#{ref}</a>"
+    "<a href=\"#{in_place_urls[index]}\">#{ref}</a>"
   end
 end
 
 def mdy(time)
   "#{MONTHS[time.month - 1]} #{time.day}, #{time.year}"
 end
-
-@code = []
-@in_place_urls = []
 
 page = ENV.fetch("QUERY_STRING", "")[/\A(#{LINK})\z/, 1] || "WelcomeVisitors"
 
