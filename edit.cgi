@@ -8,7 +8,7 @@
 
 # use strict;
 $|++;
-print "Content-type: text/html\n\n";
+print "Content-type: text/html; charset=UTF-8\n\n";
 
 my $link = "[A-Z][a-z0-9]+([A-Z][a-z0-9]+)+";
 my $mark = "\263";
