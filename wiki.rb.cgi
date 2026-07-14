@@ -37,49 +37,49 @@ def format_body(source)
   escaped.split(/\n/).each do |line|
     in_place_urls, line = Quicki::Browser.new.extract_in_place_urls(in_place_urls, line)
 
-    code = ""
+    has_matching = false
     line.sub!(/^\t+/, "")
     if line.sub!(/^\s*$/, "<p>")
-      code = "..."
+      has_matching = true
     end
     if line.match?(/^\s/)
       body << emit_code(codes, "PRE", 1)
-      code = "PRE"
+      has_matching = true
     end
     if line.sub!(/^(\*+)/, "<li>")
       body << emit_code(codes, "UL", Regexp.last_match(1).length)
-      code = "UL"
+      has_matching = true
     end
     if line.sub!(/^(\#+)/, "<li>")
       body << emit_code(codes, "OL", Regexp.last_match(1).length)
-      code = "OL"
+      has_matching = true
     end
     if line.sub!(/^(:+)(.+?):( +)/) { "<dt>#{$2}<dd>" }
       body << emit_code(codes, "DL", Regexp.last_match(1).length)
-      code = "DL"
+      has_matching = true
     end
     if line.sub!(/^(\d+)\./, "<li>")
       body << emit_code(codes, "OL", 1)
-      code = "OL"
+      has_matching = true
     end
     if line.sub!(/^!!!!/, "")
       body << emit_code(codes, "H4", 1)
-      code = "H4"
+      has_matching = true
     end
     if line.sub!(/^!!!/, "")
       body << emit_code(codes, "H3", 1)
-      code = "H3"
+      has_matching = true
     end
     if line.sub!(/^!!/, "")
       body << emit_code(codes, "H2", 1)
-      code = "H2"
+      has_matching = true
     end
     if line.sub!(/^\"\"/, "")
       body << emit_code(codes, "BLOCKQUOTE", 1)
-      code = "BLOCKQUOTE"
+      has_matching = true
     end
 
-    body << emit_code(codes, "", 0) if code.empty?
+    body << emit_code(codes, "", 0) unless has_matching
 
     line.sub!(/^-----*/, "<hr>")
     line.gsub!(/'''(.*?)'''/, '<strong>\1</strong>')
