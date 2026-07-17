@@ -25,6 +25,73 @@ module Quicki
 
       [in_place_urls, line]
     end
+
+    def sub2html(line, has_matching)
+      rules = [
+        # pattern, replace
+        [/^\s*$/, "<p>"],
+        # match만 하고 치환은 하지 않는다.
+        # emit_code 연산 시 이 rules에 포함된 패턴만 체크하기 때문에,
+        # emit_code용 rule을 현재 rule이 모두 포함해야 한다
+        [/^\s/, nil],
+        [/^(\*+)/, "<li>"],
+        [/^(\#+)/, "<li>"],
+        [/^(:+)(.+?):( +)/, ->(m) { "<dt>#{m[2]}<dd>" }],
+        [/^(\d+)\./, "<li>"],
+        [/^!!!!/, ""],
+        [/^!!!/, ""],
+        [/^!!/, ""],
+        [/^\"\"/, ""],
+      ]
+
+      rule_n_match = rules.filter_map {|r|
+        pat = r[0]
+        mat = pat.match(line)
+        mat ? [r, mat].flatten! : nil
+      }.first
+
+      if rule_n_match
+        has_matching = true
+        pat, re, _ = rule_n_match
+        line = if re.nil? # 치환하면 안되는 경우는 여기서 처리한다
+                 line
+               elsif re.respond_to?(:call)
+                 line.sub(pat) { re.call(Regexp.last_match) }
+               else
+                 line.sub(pat, re)
+               end
+      end
+      [line, has_matching, rule_n_match]
+    end
+
+    def wrap_block_tags(body, codes, rule_n_match)
+      rules = [
+        # pattern, code, depth
+        [/^\s/, "PRE", 1],
+        [/^(\*+)/, "UL", ->(mat) {mat[1].length}],
+        [/^(\#+)/, "OL", ->(mat) {mat[1].length}],
+        [/^(:+)(.+?):( +)/, "DL", ->(mat) {mat[1].length}],
+        [/^(\d+)\./, "OL", 1],
+        [/^!!!!/, "H4", 1],
+        [/^!!!/, "H3", 1],
+        [/^!!/, "H2", 1],
+        [/^\"\"/, "BLOCKQUOTE", 1],
+      ]
+      if rule_n_match
+        pat, _, mat = rule_n_match
+
+        r = rules.find {|r| r[0] == pat}
+        return body unless r
+
+        _, code, depth = r
+        body << if depth.respond_to?(:call)
+                  emit_code(codes, code, depth.call(mat))
+                else
+                  emit_code(codes, code, depth)
+                end
+      end
+      body
+    end
   end
 end
 
@@ -34,50 +101,16 @@ def format_body(source)
   body = +""
   escaped = source.gsub("&", "&amp;").gsub("<", "&lt;").gsub(">", "&gt;")
 
+  qb = Quicki::Browser.new
   escaped.split(/\n/).each do |line|
-    in_place_urls, line = Quicki::Browser.new.extract_in_place_urls(in_place_urls, line)
+    in_place_urls, line = qb.extract_in_place_urls(in_place_urls, line)
 
     has_matching = false
     line.sub!(/^\t+/, "")
-    if line.sub!(/^\s*$/, "<p>")
-      has_matching = true
-    end
-    if line.match?(/^\s/)
-      body << emit_code(codes, "PRE", 1)
-      has_matching = true
-    end
-    if line.sub!(/^(\*+)/, "<li>")
-      body << emit_code(codes, "UL", Regexp.last_match(1).length)
-      has_matching = true
-    end
-    if line.sub!(/^(\#+)/, "<li>")
-      body << emit_code(codes, "OL", Regexp.last_match(1).length)
-      has_matching = true
-    end
-    if line.sub!(/^(:+)(.+?):( +)/) { "<dt>#{$2}<dd>" }
-      body << emit_code(codes, "DL", Regexp.last_match(1).length)
-      has_matching = true
-    end
-    if line.sub!(/^(\d+)\./, "<li>")
-      body << emit_code(codes, "OL", 1)
-      has_matching = true
-    end
-    if line.sub!(/^!!!!/, "")
-      body << emit_code(codes, "H4", 1)
-      has_matching = true
-    end
-    if line.sub!(/^!!!/, "")
-      body << emit_code(codes, "H3", 1)
-      has_matching = true
-    end
-    if line.sub!(/^!!/, "")
-      body << emit_code(codes, "H2", 1)
-      has_matching = true
-    end
-    if line.sub!(/^\"\"/, "")
-      body << emit_code(codes, "BLOCKQUOTE", 1)
-      has_matching = true
-    end
+
+    line, has_matching, rule_n_match = qb.sub2html(line, has_matching)
+
+    body = qb.wrap_block_tags(body, codes, rule_n_match)
 
     body << emit_code(codes, "", 0) unless has_matching
 
