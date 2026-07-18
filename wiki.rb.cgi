@@ -132,14 +132,15 @@ end
 def emit_code(codes, code, depth)
   tags = +""
   while codes.length > depth
-    tags << "</#{codes.pop}>\n<p>"
+    tags << "</#{codes[-1]}>\n<p>"
+    codes.pop
   end
   while codes.length < depth
-    codes << code
     tags << "<#{code}>"
+    codes << code
   end
-  if codes.last.to_s != code
-    tags << "</#{codes.last}>\n<#{code}>"
+  if codes[-1].to_s != code
+    tags << "</#{codes[-1]}>\n<#{code}>"
     codes[-1] = code
   end
   tags
