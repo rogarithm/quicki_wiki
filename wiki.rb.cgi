@@ -64,7 +64,7 @@ module Quicki
       [line, has_matching, rule_n_match]
     end
 
-    def wrap_block_tags(body, codes, rule_n_match)
+    def wrap_block_tags(codes, rule_n_match)
       rules = [
         # pattern, code, depth
         [/^\s/, "PRE", 1],
@@ -77,20 +77,18 @@ module Quicki
         [/^!!/, "H2", 1],
         [/^\"\"/, "BLOCKQUOTE", 1],
       ]
-      if rule_n_match
-        pat, _, mat = rule_n_match
+      return "" unless rule_n_match
 
-        r = rules.find {|r| r[0] == pat}
-        return body unless r
+      pat, _, mat = rule_n_match
+      r = rules.find {|r| r[0] == pat}
+      return "" unless r
 
-        _, code, depth = r
-        body << if depth.respond_to?(:call)
-                  emit_code(codes, code, depth.call(mat))
-                else
-                  emit_code(codes, code, depth)
-                end
+      _, code, depth = r
+      if depth.respond_to?(:call)
+        emit_code(codes, code, depth.call(mat))
+      else
+        emit_code(codes, code, depth)
       end
-      body
     end
   end
 end
@@ -110,8 +108,9 @@ def format_body(source)
 
     line, has_matching, rule_n_match = qb.sub2html(line, has_matching)
 
-    body = qb.wrap_block_tags(body, codes, rule_n_match)
+    body << qb.wrap_block_tags(codes, rule_n_match)
 
+    # 블록 규칙에 매칭되지 않는 경우, 열린 블록을 모두 닫는다
     body << emit_code(codes, "", 0) unless has_matching
 
     line.sub!(/^-----*/, "<hr>")
