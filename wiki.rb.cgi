@@ -1,15 +1,41 @@
 #!/usr/bin/env ruby
 
-$stdout.sync = true
-print "Content-type: text/html; charset=UTF-8\n\n"
-
-MARK = "\263".b
-LINK = /[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]+)+/
-PROTOCOL = /(?:http|ftp|mailto|file|gopher|telnet|news)/
-MONTHS = %w[January February March April May June July August September October November December]
-
 module Quicki
   class Browser
+    def format_body(source)
+      codes = []
+      in_place_urls = []
+      body = +""
+      escaped = source.gsub("&", "&amp;").gsub("<", "&lt;").gsub(">", "&gt;")
+
+      escaped.split(/\n/).each do |line|
+        in_place_urls, line = extract_in_place_urls(in_place_urls, line)
+
+        has_matching = false
+        line.sub!(/^\t+/, "")
+
+        line, has_matching, rule_n_match = sub2html(line, has_matching)
+
+        body << wrap_block_tags(codes, rule_n_match)
+
+        # 블록 규칙에 매칭되지 않는 경우, 열린 블록을 모두 닫는다
+        body << emit_code(codes, "", 0) unless has_matching
+
+        line.sub!(/^-----*/, "<hr>")
+        line.gsub!(/'''(.*?)'''/, '<strong>\1</strong>')
+        line.gsub!(/''(.*?)''/, '<em>\1</em>')
+        line.gsub!(/\[Search\]/, "<form action=search.cgi><input type=text name=search size=40>\n   <input type=\"submit\" value=\"Search\"></form>")
+        line.gsub!(LINK) { |match| as_anchor(match) }
+        marker_pattern = Regexp.new("#{Regexp.escape(MARK)}(\\d+)#{Regexp.escape(MARK)}".b)
+        line.gsub!(marker_pattern) { in_place_url(in_place_urls, Regexp.last_match(1).to_i) }
+
+        body << line << "\n"
+      end
+
+      body << emit_code(codes, "", 0)
+      body
+    end
+
     def extract_in_place_urls(in_place_urls, line)
       index = 0
 
@@ -90,81 +116,50 @@ module Quicki
         emit_code(codes, code, depth)
       end
     end
+
+    def emit_code(codes, code, depth)
+      tags = +""
+      while codes.length > depth
+        tags << "</#{codes[-1]}>\n<p>"
+        codes.pop
+      end
+      while codes.length < depth
+        tags << "<#{code}>"
+        codes << code
+      end
+      if codes[-1].to_s != code
+        tags << "</#{codes[-1]}>\n<#{code}>"
+        codes[-1] = code
+      end
+      tags
+    end
+
+    def as_anchor(title)
+      if File.exist?(File.join("pages", title))
+        "<a href=wiki.cgi?#{title}>#{title}</a>"
+      else
+        "<a href=edit.cgi?#{title}>?</a>#{title}"
+      end
+    end
+
+    def in_place_url(in_place_urls, index)
+      ref = in_place_urls[index].sub(/^(javascript.{30}).*/, '\1 ...')
+      if ref.match?(/\.(gif|jpeg|jpg|png)\z/i)
+        "<img src=\"#{ref}\">"
+      else
+        "<a href=\"#{in_place_urls[index]}\">#{ref}</a>"
+      end
+    end
   end
 end
 
-def format_body(source)
-  codes = []
-  in_place_urls = []
-  body = +""
-  escaped = source.gsub("&", "&amp;").gsub("<", "&lt;").gsub(">", "&gt;")
+$stdout.sync = true
+print "Content-type: text/html; charset=UTF-8\n\n"
 
-  qb = Quicki::Browser.new
-  escaped.split(/\n/).each do |line|
-    in_place_urls, line = qb.extract_in_place_urls(in_place_urls, line)
-
-    has_matching = false
-    line.sub!(/^\t+/, "")
-
-    line, has_matching, rule_n_match = qb.sub2html(line, has_matching)
-
-    body << qb.wrap_block_tags(codes, rule_n_match)
-
-    # 블록 규칙에 매칭되지 않는 경우, 열린 블록을 모두 닫는다
-    body << emit_code(codes, "", 0) unless has_matching
-
-    line.sub!(/^-----*/, "<hr>")
-    line.gsub!(/'''(.*?)'''/, '<strong>\1</strong>')
-    line.gsub!(/''(.*?)''/, '<em>\1</em>')
-    line.gsub!(/\[Search\]/, "<form action=search.cgi><input type=text name=search size=40>\n   <input type=\"submit\" value=\"Search\"></form>")
-    line.gsub!(LINK) { |match| as_anchor(match) }
-    marker_pattern = Regexp.new("#{Regexp.escape(MARK)}(\\d+)#{Regexp.escape(MARK)}".b)
-    line.gsub!(marker_pattern) { in_place_url(in_place_urls, Regexp.last_match(1).to_i) }
-
-    body << line << "\n"
-  end
-
-  body << emit_code(codes, "", 0)
-  body
-end
-
-def emit_code(codes, code, depth)
-  tags = +""
-  while codes.length > depth
-    tags << "</#{codes[-1]}>\n<p>"
-    codes.pop
-  end
-  while codes.length < depth
-    tags << "<#{code}>"
-    codes << code
-  end
-  if codes[-1].to_s != code
-    tags << "</#{codes[-1]}>\n<#{code}>"
-    codes[-1] = code
-  end
-  tags
-end
-
-def as_anchor(title)
-  if File.exist?(File.join("pages", title))
-    "<a href=wiki.cgi?#{title}>#{title}</a>"
-  else
-    "<a href=edit.cgi?#{title}>?</a>#{title}"
-  end
-end
-
-def in_place_url(in_place_urls, index)
-  ref = in_place_urls[index].sub(/^(javascript.{30}).*/, '\1 ...')
-  if ref.match?(/\.(gif|jpeg|jpg|png)\z/i)
-    "<img src=\"#{ref}\">"
-  else
-    "<a href=\"#{in_place_urls[index]}\">#{ref}</a>"
-  end
-end
-
-def mdy(time)
-  "#{MONTHS[time.month - 1]} #{time.day}, #{time.year}"
-end
+MARK = "\263".b
+LINK = /[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]+)+/
+PROTOCOL = /(?:http|ftp|mailto|file|gopher|telnet|news)/
+MONTHS = %w[January February March April May June July August September October November December]
 
 page = ENV.fetch("QUERY_STRING", "")[/\A(#{LINK})\z/, 1] || "WelcomeVisitors"
 
@@ -187,8 +182,9 @@ if File.exist?(page_path)
     source = mapped["text"]
   end
 
-  body = format_body(source.to_s)
-  date = mdy(File.mtime(page_path))
+  body = Quicki::Browser.new.format_body(source.to_s)
+  time = File.mtime(page_path)
+  date = "#{MONTHS[time.month - 1]} #{time.day}, #{time.year}"
 else
   body = "  \"#{page}\" does not yet exist. <BR>\n" \
     "  Use the <strong>Edit</strong> button to create it.\n"
