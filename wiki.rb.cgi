@@ -2,7 +2,56 @@
 
 module Quicki
   class Browser
-    def format_body(source)
+    MARK = "\263".b
+    LINK = /[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]+)+/
+    PROTOCOL = /(?:http|ftp|mailto|file|gopher|telnet|news)/
+    MONTHS = %w[January February March April May June July August September October November December]
+
+    def handle_req
+      $stdout.sync = true
+      print "Content-type: text/html; charset=UTF-8\n\n"
+
+      page = ENV.fetch("QUERY_STRING", "")[/\A(#{LINK})\z/, 1] || "WelcomeVisitors"
+
+      par = {}
+      par["page"] = page
+      par["title"] = page.gsub(/(.)([A-Z])/, '\1 \2')
+
+      body = nil
+      date = nil
+
+      page_path = File.join("pages", page)
+      if File.exist?(page_path)
+        source = File.binread(page_path)
+        if source.include?(MARK)
+          fields = source.split(MARK, -1)
+          mapped = {}
+          fields.each_slice(2) do |key, value|
+            mapped[key] = value
+          end
+          source = mapped["text"]
+        end
+
+        body = render_wiki_doc(source.to_s)
+        time = File.mtime(page_path)
+        date = "#{MONTHS[time.month - 1]} #{time.day}, #{time.year}"
+      else
+        body = "  \"#{page}\" does not yet exist. <BR>\n" \
+          "  Use the <strong>Edit</strong> button to create it.\n"
+      end
+
+      par["summary"] = " -- Last edited #{date}" if date
+      par["body"] = body
+      par["action"] = " <form method=post action=\"edit.cgi?#{page}\">\n" \
+        " <input type=submit value=\" Edit \">\n" \
+        " </form>\n"
+
+      template = File.binread("template.html")
+      template.gsub!(/\$(\w+)/) { par.fetch(Regexp.last_match(1), "") }
+      print template
+    end
+
+    def render_wiki_doc(source)
       codes = []
       in_place_urls = []
       body = +""
@@ -153,49 +202,4 @@ module Quicki
   end
 end
 
-$stdout.sync = true
-print "Content-type: text/html; charset=UTF-8\n\n"
-
-MARK = "\263".b
-LINK = /[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]+)+/
-PROTOCOL = /(?:http|ftp|mailto|file|gopher|telnet|news)/
-MONTHS = %w[January February March April May June July August September October November December]
-
-page = ENV.fetch("QUERY_STRING", "")[/\A(#{LINK})\z/, 1] || "WelcomeVisitors"
-
-par = {}
-par["page"] = page
-par["title"] = page.gsub(/(.)([A-Z])/, '\1 \2')
-
-body = nil
-date = nil
-
-page_path = File.join("pages", page)
-if File.exist?(page_path)
-  source = File.binread(page_path)
-  if source.include?(MARK)
-    fields = source.split(MARK, -1)
-    mapped = {}
-    fields.each_slice(2) do |key, value|
-      mapped[key] = value
-    end
-    source = mapped["text"]
-  end
-
-  body = Quicki::Browser.new.format_body(source.to_s)
-  time = File.mtime(page_path)
-  date = "#{MONTHS[time.month - 1]} #{time.day}, #{time.year}"
-else
-  body = "  \"#{page}\" does not yet exist. <BR>\n" \
-    "  Use the <strong>Edit</strong> button to create it.\n"
-end
-
-par["summary"] = " -- Last edited #{date}" if date
-par["body"] = body
-par["action"] = " <form method=post action=\"edit.cgi?#{page}\">\n" \
-  " <input type=submit value=\" Edit \">\n" \
-  " </form>\n"
-
-template = File.binread("template.html")
-template.gsub!(/\$(\w+)/) { par.fetch(Regexp.last_match(1), "") }
-print template
+Quicki::Browser.new.handle_req
