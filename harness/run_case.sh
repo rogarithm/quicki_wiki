@@ -18,6 +18,7 @@ prepare_req_data() {
   local server_software="Apache"
   local stdin_body=""
   local snapshot_pages=()
+  local requires_wiki_doc_rev_dir=false
 
   case "$script_name:$case_name" in
     wiki:welcome)
@@ -64,24 +65,28 @@ prepare_req_data() {
       request_method="POST"
       stdin_body="Text=Line+One&mode=edit"
       snapshot_pages=("SaveOverwrite")
+      requires_wiki_doc_rev_dir=true
       ;;
     save:append)
       query_string="GuestBook"
       request_method="POST"
       stdin_body="Text=Appended+note&mode=append"
       snapshot_pages=("GuestBook")
+      requires_wiki_doc_rev_dir=true
       ;;
     save:crlf)
       query_string="SaveCrlf"
       request_method="POST"
       stdin_body="Text=Line1%0D%0ALine2&mode=edit"
       snapshot_pages=("SaveCrlf")
+      requires_wiki_doc_rev_dir=true
       ;;
     save:backlink)
       query_string="SaveBacklink"
       request_method="POST"
       stdin_body="Text=Before+%3C%3CMainTopic+After&mode=edit"
       snapshot_pages=("SaveBacklink" "MainTopic")
+      requires_wiki_doc_rev_dir=true
       ;;
     *)
       echo "unknown case: $script_name:$case_name" >&2
@@ -89,7 +94,7 @@ prepare_req_data() {
       ;;
   esac
 
-  declare -p query_string request_method server_software stdin_body snapshot_pages
+  declare -p query_string request_method server_software stdin_body snapshot_pages requires_wiki_doc_rev_dir
 }
 
 prepare_test_dir() {
@@ -138,7 +143,9 @@ run_case() {
   local test_tmpdir
 
   mkdir -p "$(dirname "$cgi_resp_path")"
-  mkdir -p "$wiki_doc_rev_dir"
+  if [[ "$requires_wiki_doc_rev_dir" == true ]]; then
+    mkdir -p "$wiki_doc_rev_dir"
+  fi
   content_length="${#stdin_body}"
   test_tmpdir="$(prepare_test_dir)"
 
@@ -154,11 +161,13 @@ run_case() {
       "$interpreter" "$script_path" > "$cgi_resp_path"
   )
 
-  for page in "${snapshot_pages[@]}"; do
-    if [[ -f "$test_tmpdir/pages/$page" ]]; then
-      cp "$test_tmpdir/pages/$page" "$wiki_doc_rev_dir/$page"
-    fi
-  done
+  if [[ "$requires_wiki_doc_rev_dir" == true ]]; then
+    for page in "${snapshot_pages[@]}"; do
+      if [[ -f "$test_tmpdir/pages/$page" ]]; then
+        cp "$test_tmpdir/pages/$page" "$wiki_doc_rev_dir/$page"
+      fi
+    done
+  fi
 
   rm -rf "$test_tmpdir"
 }
