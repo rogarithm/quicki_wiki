@@ -20,74 +20,64 @@ prepare_req_data() {
   local snapshot_pages=()
   local requires_wiki_doc_rev_dir=false
 
-  case "$script_name:$case_name" in
-    wiki:welcome)
-      query_string="WelcomeVisitors"
-      ;;
-    wiki:existing)
-      query_string="WikiEdit"
-      ;;
-    wiki:missing)
-      query_string="MissingPage"
-      ;;
-    wiki:mixed)
-      query_string="MixedMarkup"
-      ;;
-    edit:new)
-      query_string="MissingPage"
-      ;;
-    edit:existing)
-      query_string="WelcomeVisitors"
-      ;;
-    edit:append)
-      query_string="GuestBook"
+  case "$script_name" in
+    wiki)
+      case "$case_name" in
+        welcome) query_string="WelcomeVisitors" ;;
+        existing) query_string="WikiEdit" ;;
+        missing) query_string="MissingPage" ;;
+        mixed) query_string="MixedMarkup" ;;
+      esac ;;
+    edit)
+      case "$case_name" in
+        new) query_string="MissingPage" ;;
+        existing) query_string="WelcomeVisitors" ;;
+        append)
+          query_string="GuestBook"
+          request_method="POST"
+          stdin_body="append=1"
+          ;;
+      esac ;;
+    search)
+      case "$case_name" in
+        hit) query_string="search=Wiki" ;;
+        none) query_string="search=NoSuchNeedle" ;;
+        special) query_string="search=wiki.org%2F" ;;
+      esac ;;
+    changes)
+      case "$case_name" in
+        default) ;;
+        max3) query_string="max=3" ;;
+      esac ;;
+    refcount)
+      case "$case_name" in
+        default) ;;
+      esac ;;
+    save)
       request_method="POST"
-      stdin_body="append=1"
-      ;;
-    search:hit)
-      query_string="search=Wiki"
-      ;;
-    search:none)
-      query_string="search=NoSuchNeedle"
-      ;;
-    search:special)
-      query_string="search=wiki.org%2F"
-      ;;
-    changes:default)
-      ;;
-    changes:max3)
-      query_string="max=3"
-      ;;
-    refcount:default)
-      ;;
-    save:overwrite)
-      query_string="SaveOverwrite"
-      request_method="POST"
-      stdin_body="Text=Line+One&mode=edit"
-      snapshot_pages=("SaveOverwrite")
       requires_wiki_doc_rev_dir=true
-      ;;
-    save:append)
-      query_string="GuestBook"
-      request_method="POST"
-      stdin_body="Text=Appended+note&mode=append"
-      snapshot_pages=("GuestBook")
-      requires_wiki_doc_rev_dir=true
-      ;;
-    save:crlf)
-      query_string="SaveCrlf"
-      request_method="POST"
-      stdin_body="Text=Line1%0D%0ALine2&mode=edit"
-      snapshot_pages=("SaveCrlf")
-      requires_wiki_doc_rev_dir=true
-      ;;
-    save:backlink)
-      query_string="SaveBacklink"
-      request_method="POST"
-      stdin_body="Text=Before+%3C%3CMainTopic+After&mode=edit"
-      snapshot_pages=("SaveBacklink" "MainTopic")
-      requires_wiki_doc_rev_dir=true
-      ;;
+      case "$case_name" in
+        overwrite)
+          query_string="SaveOverwrite"
+          stdin_body="Text=Line+One&mode=edit"
+          snapshot_pages=("SaveOverwrite")
+          ;;
+        append)
+          query_string="GuestBook"
+          stdin_body="Text=Appended+note&mode=append"
+          snapshot_pages=("GuestBook")
+          ;;
+        crlf)
+          query_string="SaveCrlf"
+          stdin_body="Text=Line1%0D%0ALine2&mode=edit"
+          snapshot_pages=("SaveCrlf")
+          ;;
+        backlink)
+          query_string="SaveBacklink"
+          stdin_body="Text=Before+%3C%3CMainTopic+After&mode=edit"
+          snapshot_pages=("SaveBacklink" "MainTopic")
+          ;;
+      esac ;;
     *)
       echo "unknown case: $script_name:$case_name" >&2
       exit 1
