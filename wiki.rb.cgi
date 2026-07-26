@@ -17,9 +17,7 @@ module Quicki
       par["page"] = page
       par["title"] = page.gsub(/(.)([A-Z])/, '\1 \2')
 
-      body = nil
       date = nil
-
       page_path = File.join("pages", page)
       if File.exist?(page_path)
         source = File.binread(page_path)
