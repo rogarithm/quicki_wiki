@@ -17,9 +17,10 @@ module Quicki
 
       target = target.gsub('"', "&quot;")
 
-      hits = count_hits(regex)
       files = Dir.children("pages").select { |name| name.match?(LINK) }.sort
-      body = gen_body(target, regex)
+      pages = files.to_h { |file| [file, File.binread(File.join("pages", file))] }
+      hits = count_hits(regex, pages)
+      body = gen_body(target, regex, pages)
 
       par = {}
       par["summary"] = "#{hits.zero? ? 'No' : hits} pages found out of #{files.length} pages searched."
@@ -35,12 +36,9 @@ module Quicki
       print template
     end
 
-    def count_hits(regex)
+    def count_hits(regex, pages)
       hits = 0
-      files = Dir.children("pages").select { |name| name.match?(LINK) }.sort
-      files.each do |file|
-        contents = File.binread(File.join("pages", file))
-
+      pages.each do |file, contents|
         if regex.match(file) || regex.match(contents)
           hits += 1
         end
@@ -48,7 +46,7 @@ module Quicki
       hits
     end
 
-    def gen_body(target, regex)
+    def gen_body(target, regex, pages)
       body = <<-FORM
  <form action=search.cgi>
   <input
@@ -60,10 +58,7 @@ module Quicki
  </form>
 FORM
 
-      files = Dir.children("pages").select { |name| name.match?(LINK) }.sort
-      files.each do |file|
-        contents = File.binread(File.join("pages", file))
-
+      pages.each do |file, contents|
         match = nil
         if (match_data = regex.match(file))
           match = match_data[0]

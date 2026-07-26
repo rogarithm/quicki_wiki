@@ -6,8 +6,19 @@ module Quicki
     MONTHS = %w[January February March April May June July August September October November December]
 
     def handle_req
+      # 최근 날짜가 앞에 오도록 파일을 정렬한다
+      dated_pages = Dir.children("pages")
+                       .select { |name| name.match?(LINK) }
+                       .map { |name| [File.mtime(File.join("pages", name)), name] }
+                       .sort_by(&:first)
+                       .reverse
+
+      # 최대로 보여 줄 파일 갯수
+      max = ENV.fetch("QUERY_STRING", "")[/\bmax=(\d+)/, 1]
+      max = max ? max.to_i : 25
+
       par = {}
-      par["body"] = gen_body
+      par["body"] = gen_body(dated_pages, max)
       par["title"] = "Recent Changes"
       par["page"] = "http:changes.cgi"
 
@@ -22,18 +33,7 @@ module Quicki
       print template
     end
 
-    def gen_body
-      # 최근 날짜가 앞에 오도록 파일을 정렬한다
-      dated_pages = Dir.children("pages")
-                       .select { |name| name.match?(LINK) }
-                       .map { |name| [File.mtime(File.join("pages", name)), name] }
-                       .sort_by(&:first)
-                       .reverse
-
-      # 최대로 보여 줄 파일 갯수
-      max = ENV.fetch("QUERY_STRING", "")[/\bmax=(\d+)/, 1]
-      max = max ? max.to_i : 25
-
+    def gen_body(dated_pages, max)
       body = "<dl>\n"
       last_date = nil
       dated_pages.each do |time, file|

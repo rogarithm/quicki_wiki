@@ -6,11 +6,15 @@ module Quicki
     LINK = /[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]+)+/
 
     def handle_req
+      files = Dir.children("pages").select { |name| name.match?(/\A#{LINK}\z/) }
+      # 파일명=>파일 내용 형식의 해시를 만든다
+      pages = files.to_h { |file| [file, File.binread(File.join("pages", file))] }
+
       par = {}
       par["summary"] = ""
       par["title"] = "Page References"
       par["page"] = "http:pagerefs.cgi"
-      par["body"] = gen_body
+      par["body"] = gen_body(pages)
 
       template = File.binread("template.html")
       template.gsub!(/\$(\w+)/) do
@@ -23,14 +27,14 @@ module Quicki
       print template
     end
 
-    def gen_body
-      files = Dir.children("pages").select { |name| name.match?(/\A#{LINK}\z/) }
+    def gen_body(pages)
+      files = pages.keys
       refs = Hash.new do |hash, key| # hash는 refs 자신
         hash[key] = [] # hash[key] 데이터가 없을 경우 기본값을 설정한다
       end
 
       files.each do |file|
-        contents = File.binread(File.join("pages", file))
+        contents = pages[file]
         targets = {}
         contents.scan(LINK) do |mat_link|
           # mat_link 페이지를 file 위키 페이지에서 참조하고 있음을 중복되지 않게 기록한다

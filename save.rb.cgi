@@ -12,33 +12,13 @@ module Quicki
       input = STDIN.read(ENV.fetch("CONTENT_LENGTH", "0").to_i)
       body = gen_body(input)
 
-      text = body.fetch("Text", "")
-      text = if text.include?("\n")
-               text.delete("\r")
-             else
-               text.tr("\r", "\n")
-             end
-
-      text = text.delete(MARK)
-
-      # <<WikiWord 형식이 있으면 WikiWord 페이지에 현재 페이지 백링크를 추가한다
-      backlink_target = nil
-      text = text.gsub(/<<(#{LINK})\b/) do
-        backlink_target = Regexp.last_match(1) # <<를 제외한 LINK 형식 문자열
-        backlink_target
-      end
+      text, backlink_target, mode = gen_text(body)
 
       $stdout.sync = true
       if backlink_target
         File.open(File.join("pages", backlink_target), "a") do |file|
           file.write("\n----\n#{page}")
         end
-      end
-
-      mode = "w"
-      if body.fetch("mode", "") =~ /append/
-        mode = "a"
-        text = "\n----\n\n#{text}"
       end
 
       File.open(File.join("pages", page), mode) do |file|
@@ -67,6 +47,32 @@ module Quicki
         body[key] = value
       end
       body
+    end
+
+    def gen_text(body)
+      text = body.fetch("Text", "")
+      text = if text.include?("\n")
+               text.delete("\r")
+             else
+               text.tr("\r", "\n")
+             end
+
+      text = text.delete(MARK)
+
+      # <<WikiWord 형식이 있으면 WikiWord 페이지에 현재 페이지 백링크를 추가한다
+      backlink_target = nil
+      text = text.gsub(/<<(#{LINK})\b/) do
+        backlink_target = Regexp.last_match(1) # <<를 제외한 LINK 형식 문자열
+        backlink_target
+      end
+
+      mode = "w"
+      if body.fetch("mode", "") =~ /append/
+        mode = "a"
+        text = "\n----\n\n#{text}"
+      end
+
+      [text, backlink_target, mode]
     end
   end
 end

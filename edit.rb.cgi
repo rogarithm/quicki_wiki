@@ -8,9 +8,11 @@ module Quicki
     def handle_req
       page = ENV.fetch("QUERY_STRING", "")[LINK] || "WelcomeVisitors"
       input = STDIN.read(ENV.fetch("CONTENT_LENGTH", "0").to_i)
+      page_path = File.join("pages", page)
+      source = File.exist?(page_path) ? File.binread(page_path) : nil
 
       mode = input.match?(/append/)
-      text = gen_body(page)
+      text = gen_body(source)
 
       par = {}
       if mode
@@ -40,14 +42,11 @@ module Quicki
       print template
     end
 
-    def gen_body(page)
-      page_path = File.join("pages", page)
-
-      unless File.exist?(page_path)
+    def gen_body(source)
+      unless source
         return ''
       end
 
-      source = File.binread(page_path)
       if source.include?(MARK)
         fields = source.split(MARK, -1)
         mapped = {}
