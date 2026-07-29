@@ -20,7 +20,7 @@ module Quicki
       date = nil
       page_path = File.join("pages", page)
       if File.exist?(page_path)
-        source = File.binread(page_path)
+        source = File.binread(page_path).force_encoding("UTF-8")
 
         body = render_wiki_doc(source.to_s)
         time = File.mtime(page_path)
