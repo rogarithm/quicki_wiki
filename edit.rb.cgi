@@ -3,7 +3,7 @@
 module Quicki
   class Editor
     LINK = /[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]+)+/
-    MARK = "\263".b
+    MARK = "\uE000"
 
     def handle_req
       page = ENV.fetch("QUERY_STRING", "")[LINK] || "WelcomeVisitors"
@@ -47,14 +47,6 @@ module Quicki
         return ''
       end
 
-      if source.include?(MARK)
-        fields = source.split(MARK, -1)
-        mapped = {}
-        fields.each_slice(2) do |key, value|
-          mapped[key] = value
-        end
-        source = mapped["text"].to_s
-      end
       source.gsub("&", "&amp;").gsub("<", "&lt;").gsub(">", "&gt;")
     end
   end
