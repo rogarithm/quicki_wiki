@@ -1,0 +1,123 @@
+require_relative "test_helper"
+
+class SaveCgiTest < Minitest::Test
+  def setup
+    @writer = Quicki::Writer.new
+  end
+
+  # QUERY_STRING이 유효한 WikiWord가 아니면 BadSaveName 예외를 발생시킨다
+  def test_handle_req_raises_for_invalid_query_string
+    error = with_env("QUERY_STRING" => "invalid-name", "CONTENT_LENGTH" => "0") do
+      assert_raises(RuntimeError) do
+        capture_with_stdin { @writer.handle_req }
+      end
+    end
+
+    assert_equal("BadSaveName\n", error.message)
+  end
+
+  # CONTENT_LENGTH만큼만 stdin을 읽어 저장 입력으로 사용한다
+  def test_handle_req_reads_only_content_length_bytes
+    in_tmpdir do
+      FileUtils.mkdir_p("pages")
+      write_page("SavePage", "old")
+      observed_length = nil
+      @writer.stub(:gen_body, lambda { |raw|
+        observed_length = raw.bytesize
+        {"Text" => "saved", "mode" => "edit"}
+      }) do
+        @writer.stub(:gen_text, ["saved", nil, "w"]) do
+          @writer.stub(:load, true) do
+            with_env("QUERY_STRING" => "SavePage", "CONTENT_LENGTH" => "4") do
+              capture_with_stdin("1234ignored") { @writer.handle_req }
+            end
+          end
+        end
+      end
+
+      assert_equal(4, observed_length)
+    end
+  end
+
+  # 백링크 대상이 있으면 대상 페이지 끝에 현재 페이지명을 추가한다
+  def test_handle_req_appends_backlink_to_target_page
+    in_tmpdir do
+      FileUtils.mkdir_p("pages")
+      write_page("SaveBacklink", "")
+      write_page("MainTopic", "topic")
+
+      @writer.stub(:load, true) do
+        with_env("QUERY_STRING" => "SaveBacklink", "CONTENT_LENGTH" => "34") do
+          capture_with_stdin("Text=Before+%3C%3CMainTopic&mode=edit") { @writer.handle_req }
+        end
+      end
+
+      assert_equal("topic\n----\nSaveBacklink", File.binread("pages/MainTopic"))
+    end
+  end
+
+  # 저장 후 wiki.rb.cgi를 다시 로드해 렌더링을 이어서 수행한다
+  def test_handle_req_loads_wiki_renderer_after_saving
+    in_tmpdir do
+      FileUtils.mkdir_p("pages")
+      write_page("SavePage", "old")
+      called = false
+
+      @writer.stub(:load, lambda { |_path, _wrap|
+        called = true
+      }) do
+        with_env("QUERY_STRING" => "SavePage", "CONTENT_LENGTH" => "24") do
+          capture_with_stdin("Text=hello&mode=edit") { @writer.handle_req }
+        end
+      end
+
+      assert_equal(true, called)
+    end
+  end
+
+  # application/x-www-form-urlencoded 본문을 key-value 해시로 파싱한다
+  def test_gen_body_parses_form_encoded_pairs
+    body = @writer.gen_body("Text=Line+One&mode=edit")
+
+    assert_equal({"Text" => "Line One", "mode" => "edit"}, body)
+  end
+
+  # 파싱한 해시의 key, value를 각각 + 문자를 공백으로 디코드, percent-encoding된 값을 원래 바이트로 복원 처리한다
+  def test_gen_body_decodes_plus_and_percent_encoded_characters
+    body = @writer.gen_body("Te%78t=A%26B+One")
+
+    assert_equal({"Text" => "A&B One"}, body)
+  end
+
+  # 본문의 줄바꿈을 처리한다
+  def test_gen_text_normalizes_line_endings
+    text, = @writer.gen_text("Text" => "a\r\nb\r", "mode" => "edit")
+    assert_equal("a\nb", text)
+
+    text2, = @writer.gen_text("Text" => "a\rb", "mode" => "edit")
+    assert_equal("a\nb", text2)
+  end
+
+  # <<WikiWord 패턴이 있으면 << 를 제거하고 링크 대상 이름만 본문에 남긴다
+  def test_gen_text_extracts_backlink_target
+    text, backlink_target, = @writer.gen_text("Text" => "Before <<MainTopic After", "mode" => "edit")
+
+    assert_equal("Before MainTopic After", text)
+    assert_equal("MainTopic", backlink_target)
+  end
+
+  # append 모드이면 본문 앞에 구분선과 빈 줄을 추가한다
+  def test_gen_text_prefixes_separator_for_append_mode
+    text, _target, mode = @writer.gen_text("Text" => "Appended", "mode" => "append")
+
+    assert_equal("\n----\n\nAppended", text)
+    assert_equal("a", mode)
+  end
+
+  # 변환된 본문, 백링크 대상, 파일 모드를 함께 반환한다
+  def test_gen_text_returns_text_backlink_and_file_mode
+    result = @writer.gen_text("Text" => "Hello", "mode" => "edit")
+
+    assert_equal(["Hello", nil, "w"], result)
+  end
+end
