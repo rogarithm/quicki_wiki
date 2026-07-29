@@ -60,4 +60,6 @@ module Quicki
   end
 end
 
-Quicki::Editor.new.handle_req
+if $PROGRAM_NAME == __FILE__
+  Quicki::Editor.new.handle_req
+end

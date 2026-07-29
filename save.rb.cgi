@@ -77,4 +77,6 @@ module Quicki
   end
 end
 
-Quicki::Writer.new.handle_req
+if $PROGRAM_NAME == __FILE__
+  Quicki::Writer.new.handle_req
+end

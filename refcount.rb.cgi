@@ -67,4 +67,6 @@ module Quicki
   end
 end
 
-Quicki::BacklinkCounter.new.handle_req
+if $PROGRAM_NAME == __FILE__
+  Quicki::BacklinkCounter.new.handle_req
+end
