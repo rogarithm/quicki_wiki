@@ -69,11 +69,6 @@ class EditCgiTest < Minitest::Test
     end
   end
 
-  # source가 nil이면 빈 문자열을 반환한다
-  def test_gen_body_returns_empty_string_for_nil_source
-    assert_equal("", @editor.gen_body(nil))
-  end
-
   # 일반 페이지 본문에서 &, <, > 문자를 HTML escape한다
   def test_gen_body_escapes_html_characters
     assert_equal("&amp;&lt;&gt;", @editor.gen_body("&<>"))

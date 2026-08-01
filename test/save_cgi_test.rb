@@ -91,9 +91,11 @@ class SaveCgiTest < Minitest::Test
 
   # 본문의 줄바꿈을 처리한다
   def test_gen_text_normalizes_line_endings
+    # \n이 이미 있는 경우 \r만 제거
     text, = @writer.gen_text("Text" => "a\r\nb\r", "mode" => "edit")
     assert_equal("a\nb", text)
 
+    # \n이 없으면 \r을 \n으로 변환
     text2, = @writer.gen_text("Text" => "a\rb", "mode" => "edit")
     assert_equal("a\nb", text2)
   end

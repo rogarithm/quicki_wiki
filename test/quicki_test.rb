@@ -51,13 +51,11 @@ class QuickiCoreTest < Minitest::Test
     assert_nil(parse_req(StringIO.new("GET\r\n\r\n")))
   end
 
-  # 루트 경로 요청이면 기본값으로 wiki.cgi를 반환한다
-  def test_find_cgi_returns_wiki_for_root_path
-    assert_equal("wiki.cgi", find_cgi("/"))
-  end
-
-  # 요청 uri로부터 cgi 경로를 추출하고 퍼센트 인코딩을 디코드한다
+  # 요청 uri로부터 cgi 경로를 추출한다
   def test_find_cgi_extracts_cgi_path_from_request_uri
+    # 기본값 처리
+    assert_equal("wiki.cgi", find_cgi("/"))
+
     assert_equal("search.cgi", find_cgi("/search.cgi?search=Wiki"))
     assert_equal("logo.gif", find_cgi("/logo%2Egif"))
   end
@@ -189,9 +187,13 @@ class QuickiCoreTest < Minitest::Test
   end
 
   # 호출자가 넘긴 헤더를 응답에 병합한다
-  def test_make_resp_merges_custom_headers
+  def test_make_resp_merges_headers_sent_by_client
     response = with_stubbed_time(Time.utc(2024, 1, 2, 3, 4, 5)) do
-      make_resp("200 OK", {"Content-Type" => "text/html", "X-Test" => "yes"}, body: "ok")
+      make_resp(
+        "200 OK",
+        {"Content-Type" => "text/html", "X-Test" => "yes"},
+        body: "ok"
+      )
     end
 
     assert_match("Content-Type: text/html", response)

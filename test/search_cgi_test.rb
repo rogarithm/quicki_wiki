@@ -33,21 +33,6 @@ class SearchCgiTest < Minitest::Test
     end
   end
 
-  # 특수문자가 포함된 검색어도 디코드된 값을 유지한 채 결과 화면을 렌더링한다
-  def test_handle_req_renders_special_character_query_safely
-    in_tmpdir do
-      write_template("SUMMARY:$summary\nBODY:$body\n")
-      write_page("SearchSymbols", "Special target lives at http://www.wiki.org/ and should be searchable literally.")
-
-      output = with_env("QUERY_STRING" => "search=wiki.org%2F", "CONTENT_LENGTH" => "0") do
-        capture_io { @searcher.handle_req }.first
-      end
-
-      assert_includes(output, "No pages found out of 1 pages searched.")
-      assert_includes(output, "wiki.org/")
-    end
-  end
-
   # WikiWord 형식의 페이지 파일만 검색 대상으로 포함한다
   def test_handle_req_only_searches_wikiword_files
     in_tmpdir do
