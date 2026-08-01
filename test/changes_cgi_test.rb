@@ -9,9 +9,13 @@ class ChangesCgiTest < Minitest::Test
   def test_handle_req_only_uses_wikiword_files
     in_tmpdir do
       write_template("BODY:$body\n")
-      write_page("WikiWord", "one")
-      File.write("pages/not-a-wiki", "skip")
-      File.utime(Time.utc(2024, 1, 1), Time.utc(2024, 1, 1), "pages/WikiWord")
+      make_wiki_doc("WikiWord") do |doc|
+        File.binwrite(doc, "one")
+        File.utime(Time.utc(2024, 1, 1), Time.utc(2024, 1, 1), doc)
+      end
+      make_wiki_doc("not-a-wiki") do |doc|
+        File.binwrite(doc, "skip")
+      end
 
       output = with_env("QUERY_STRING" => "", "CONTENT_LENGTH" => "0") do
         capture_io { @viewer.handle_req }.first
@@ -26,10 +30,14 @@ class ChangesCgiTest < Minitest::Test
   def test_handle_req_orders_pages_by_most_recent_mtime
     in_tmpdir do
       write_template("BODY:$body\n")
-      write_page("OldPage", "old")
-      write_page("NewPage", "new")
-      File.utime(Time.utc(2024, 1, 1), Time.utc(2024, 1, 1), "pages/OldPage")
-      File.utime(Time.utc(2024, 1, 2), Time.utc(2024, 1, 2), "pages/NewPage")
+      make_wiki_doc("OldPage") do |doc|
+        File.binwrite(doc, "one")
+        File.utime(Time.utc(2024, 1, 1), Time.utc(2024, 1, 1), doc)
+      end
+      make_wiki_doc("NewPage") do |doc|
+        File.binwrite(doc, "new")
+        File.utime(Time.utc(2024, 1, 2), Time.utc(2024, 1, 2), doc)
+      end
 
       output = with_env("QUERY_STRING" => "", "CONTENT_LENGTH" => "0") do
         capture_io { @viewer.handle_req }.first
@@ -43,8 +51,12 @@ class ChangesCgiTest < Minitest::Test
   def test_handle_req_respects_max_parameter
     in_tmpdir do
       write_template("BODY:$body\n")
-      write_page("FirstPage", "1")
-      write_page("SecondPage", "2")
+      make_wiki_doc("FirstPage") do |doc|
+        File.binwrite(doc, "1")
+      end
+      make_wiki_doc("SecondPage") do |doc|
+        File.binwrite(doc, "2")
+      end
 
       output = with_env("QUERY_STRING" => "max=1", "CONTENT_LENGTH" => "0") do
         capture_io { @viewer.handle_req }.first
@@ -58,7 +70,9 @@ class ChangesCgiTest < Minitest::Test
   def test_handle_req_renders_template_variables
     in_tmpdir do
       write_template("TITLE:$title\nPAGE:$page\nBODY:$body\n")
-      write_page("WikiWord", "body")
+      make_wiki_doc("WikiWord") do |doc|
+        File.binwrite(doc, "body")
+      end
 
       output = with_env("QUERY_STRING" => "", "CONTENT_LENGTH" => "0") do
         capture_io { @viewer.handle_req }.first

@@ -51,9 +51,11 @@ module QuickiTestHelpers
     File.write("template.html", contents)
   end
 
-  def write_page(name, body)
+  def make_wiki_doc(doc_name)
     FileUtils.mkdir_p("pages")
-    File.binwrite(File.join("pages", name), body)
+    File.open(File.join("pages", doc_name), "w") do |f|
+      yield f
+    end
   end
 
   def capture_with_stdin(stdin_data = "")

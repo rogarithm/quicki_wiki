@@ -9,8 +9,12 @@ class RefcountCgiTest < Minitest::Test
   def test_handle_req_only_uses_wikiword_files
     in_tmpdir do
       write_template("BODY:$body\n")
-      write_page("WikiWord", "MainTopic")
-      File.write("pages/not-a-wiki", "WikiWord")
+      make_wiki_doc("WikiWord") do |doc|
+        File.binwrite(doc, "MainTopic")
+      end
+      make_wiki_doc("not-a-wiki") do |doc|
+        File.binwrite(doc, "WikiWord")
+      end
 
       output = with_env("QUERY_STRING" => "", "CONTENT_LENGTH" => "0") do
         capture_io { @counter.handle_req }.first
@@ -25,8 +29,12 @@ class RefcountCgiTest < Minitest::Test
   def test_handle_req_reads_page_contents_and_renders_template
     in_tmpdir do
       write_template("TITLE:$title\nPAGE:$page\nBODY:$body\n")
-      write_page("WikiWord", "MainTopic")
-      write_page("MainTopic", "")
+      make_wiki_doc("WikiWord") do |doc|
+        File.binwrite(doc, "MainTopic")
+      end
+      make_wiki_doc("MainTopic") do |doc|
+        File.binwrite(doc, "")
+      end
 
       output = with_env("QUERY_STRING" => "", "CONTENT_LENGTH" => "0") do
         capture_io { @counter.handle_req }.first

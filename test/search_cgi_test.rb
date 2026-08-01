@@ -9,7 +9,9 @@ class SearchCgiTest < Minitest::Test
   def test_handle_req_extracts_search_param
     in_tmpdir do
       write_template("BODY:$body\nSUMMARY:$summary\n")
-      write_page("WikiWord", "Wiki body")
+      make_wiki_doc("WikiWord") do |doc|
+        File.binwrite(doc, "Wiki body")
+      end
 
       output = with_env("QUERY_STRING" => "search=Wiki", "CONTENT_LENGTH" => "0") do
         capture_io { @searcher.handle_req }.first
@@ -23,7 +25,9 @@ class SearchCgiTest < Minitest::Test
   def test_handle_req_decodes_search_query
     in_tmpdir do
       write_template("BODY:$body\n")
-      write_page("WikiWord", "wiki.org/path")
+      make_wiki_doc("WikiWord") do |doc|
+        File.binwrite(doc, "wiki.org/path")
+      end
 
       output = with_env("QUERY_STRING" => "search=wiki.org%2Fpath", "CONTENT_LENGTH" => "0") do
         capture_io { @searcher.handle_req }.first
@@ -37,8 +41,12 @@ class SearchCgiTest < Minitest::Test
   def test_handle_req_only_searches_wikiword_files
     in_tmpdir do
       write_template("SUMMARY:$summary\n")
-      write_page("WikiWord", "Wiki body")
-      File.write("pages/not-a-wiki", "Wiki body")
+      make_wiki_doc("WikiWord") do |doc|
+        File.binwrite(doc, "Wiki body")
+      end
+      make_wiki_doc("not-a-wiki") do |doc|
+        File.binwrite(doc, "Wiki body")
+      end
 
       output = with_env("QUERY_STRING" => "search=Wiki", "CONTENT_LENGTH" => "0") do
         capture_io { @searcher.handle_req }.first
@@ -52,8 +60,12 @@ class SearchCgiTest < Minitest::Test
   def test_handle_req_reflects_hit_count_in_summary
     in_tmpdir do
       write_template("SUMMARY:$summary\n")
-      write_page("WikiWord", "Wiki body")
-      write_page("MainTopic", "No match")
+      make_wiki_doc("WikiWord") do |doc|
+        File.binwrite(doc, "Wiki body")
+      end
+      make_wiki_doc("MainTopic") do |doc|
+        File.binwrite(doc, "No match")
+      end
 
       output = with_env("QUERY_STRING" => "search=Wiki", "CONTENT_LENGTH" => "0") do
         capture_io { @searcher.handle_req }.first
@@ -67,7 +79,9 @@ class SearchCgiTest < Minitest::Test
   def test_handle_req_uses_no_pages_found_summary_for_empty_result
     in_tmpdir do
       write_template("SUMMARY:$summary\n")
-      write_page("WikiWord", "Wiki body")
+      make_wiki_doc("WikiWord") do |doc|
+        File.binwrite(doc, "Wiki body")
+      end
 
       output = with_env("QUERY_STRING" => "search=NoSuchNeedle", "CONTENT_LENGTH" => "0") do
         capture_io { @searcher.handle_req }.first
@@ -81,7 +95,9 @@ class SearchCgiTest < Minitest::Test
   def test_handle_req_renders_template_variables
     in_tmpdir do
       write_template("TITLE:$title\nPAGE:$page\nSUMMARY:$summary\nBODY:$body\n")
-      write_page("WikiWord", "Wiki body")
+      make_wiki_doc("WikiWord") do |doc|
+        File.binwrite(doc, "Wiki body")
+      end
 
       output = with_env("QUERY_STRING" => "search=Wiki", "CONTENT_LENGTH" => "0") do
         capture_io { @searcher.handle_req }.first

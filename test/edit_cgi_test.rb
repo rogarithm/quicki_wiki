@@ -9,7 +9,9 @@ class EditCgiTest < Minitest::Test
   def test_handle_req_uses_welcome_visitors_for_invalid_query
     in_tmpdir do
       write_template
-      write_page("WelcomeVisitors", "Body")
+      make_wiki_doc("WelcomeVisitors") do |doc|
+        File.binwrite(doc, "Body")
+      end
 
       output = with_env("QUERY_STRING" => "not-valid", "CONTENT_LENGTH" => "0") do
         capture_with_stdin { @editor.handle_req }.first
@@ -23,7 +25,9 @@ class EditCgiTest < Minitest::Test
   def test_handle_req_renders_textarea_body_based_on_page_presence
     in_tmpdir do
       write_template
-      write_page("WelcomeVisitors", "A&B")
+      make_wiki_doc("WelcomeVisitors") do |doc|
+        File.binwrite(doc, "A&B")
+      end
 
       existing = with_env("QUERY_STRING" => "WelcomeVisitors", "CONTENT_LENGTH" => "0") do
         capture_with_stdin { @editor.handle_req }.first
@@ -41,7 +45,9 @@ class EditCgiTest < Minitest::Test
   def test_handle_req_switches_to_append_mode
     in_tmpdir do
       write_template
-      write_page("GuestBook", "Existing")
+      make_wiki_doc("GuestBook") do |doc|
+        File.binwrite(doc, "Existing")
+      end
 
       output = with_env("QUERY_STRING" => "GuestBook", "CONTENT_LENGTH" => "8") do
         capture_with_stdin("append=1") { @editor.handle_req }.first
@@ -57,7 +63,9 @@ class EditCgiTest < Minitest::Test
   def test_handle_req_renders_template_variables
     in_tmpdir do
       write_template("TITLE:$title\nPAGE:$page\nBODY:$body\n")
-      write_page("WelcomeVisitors", "Body")
+      make_wiki_doc("WelcomeVisitors") do |doc|
+        File.binwrite(doc, "Body")
+      end
 
       output = with_env("QUERY_STRING" => "WelcomeVisitors", "CONTENT_LENGTH" => "0") do
         capture_with_stdin { @editor.handle_req }.first

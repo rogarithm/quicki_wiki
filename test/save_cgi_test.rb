@@ -19,8 +19,9 @@ class SaveCgiTest < Minitest::Test
   # CONTENT_LENGTH만큼만 stdin을 읽어 저장 입력으로 사용한다
   def test_handle_req_reads_only_content_length_bytes
     in_tmpdir do
-      FileUtils.mkdir_p("pages")
-      write_page("SavePage", "old")
+      make_wiki_doc("SavePage") do |doc|
+        File.binwrite(doc, "old")
+      end
       observed_length = nil
       @writer.stub(:gen_body, lambda { |raw|
         observed_length = raw.bytesize
@@ -42,9 +43,12 @@ class SaveCgiTest < Minitest::Test
   # 백링크 대상이 있으면 대상 페이지 끝에 현재 페이지명을 추가한다
   def test_handle_req_appends_backlink_to_target_page
     in_tmpdir do
-      FileUtils.mkdir_p("pages")
-      write_page("SaveBacklink", "")
-      write_page("MainTopic", "topic")
+      make_wiki_doc("SaveBacklink") do |doc|
+        File.binwrite(doc, "")
+      end
+      make_wiki_doc("MainTopic") do |doc|
+        File.binwrite(doc, "topic")
+      end
 
       @writer.stub(:load, true) do
         with_env("QUERY_STRING" => "SaveBacklink", "CONTENT_LENGTH" => "34") do
@@ -59,8 +63,9 @@ class SaveCgiTest < Minitest::Test
   # 저장 후 wiki.rb.cgi를 다시 로드해 렌더링을 이어서 수행한다
   def test_handle_req_loads_wiki_renderer_after_saving
     in_tmpdir do
-      FileUtils.mkdir_p("pages")
-      write_page("SavePage", "old")
+      make_wiki_doc("SavePage") do |doc|
+        File.binwrite(doc, "old")
+      end
       called = false
 
       @writer.stub(:load, lambda { |_path, _wrap|

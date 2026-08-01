@@ -9,7 +9,9 @@ class WikiBrowserTest < Minitest::Test
   def test_handle_req_renders_welcome_visitors_for_blank_or_invalid_query
     in_tmpdir do
       write_template
-      write_page("WelcomeVisitors", "Welcome body")
+      make_wiki_doc("WelcomeVisitors") do |doc|
+        File.binwrite(doc, "Welcome body")
+      end
 
       output = with_env("QUERY_STRING" => "", "CONTENT_LENGTH" => "0") do
         capture_io { @browser.handle_req }.first
@@ -24,7 +26,9 @@ class WikiBrowserTest < Minitest::Test
   def test_handle_req_renders_requested_page
     in_tmpdir do
       write_template
-      write_page("WikiWord", "Page body")
+      make_wiki_doc("WikiWord") do |doc|
+        File.binwrite(doc, "Page body")
+      end
 
       output = with_env("QUERY_STRING" => "WikiWord", "CONTENT_LENGTH" => "0") do
         capture_io { @browser.handle_req }.first
@@ -66,8 +70,9 @@ class WikiBrowserTest < Minitest::Test
   # 인라인 태그를 처리한다
   def test_render_wiki_doc_processes_inline_markup
     in_tmpdir do
-      FileUtils.mkdir_p("pages")
-      File.write("pages/WikiWord", "exists")
+      make_wiki_doc("WikiWord") do |doc|
+        File.binwrite(doc, "exists")
+      end
 
       html = @browser.render_wiki_doc("-----\n'''bold'''\n''em''\n[Search]\nWikiWord MissingPage")
 
