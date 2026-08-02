@@ -53,4 +53,6 @@ module Quicki
   end
 end
 
-Quicki::ChangeViewer.new.handle_req
+if $PROGRAM_NAME == __FILE__
+  Quicki::ChangeViewer.new.handle_req
+end

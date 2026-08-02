@@ -200,4 +200,6 @@ module Quicki
   end
 end
 
-Quicki::Browser.new.handle_req
+if $PROGRAM_NAME == __FILE__
+  Quicki::Browser.new.handle_req
+end

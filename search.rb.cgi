@@ -75,4 +75,6 @@ FORM
   end
 end
 
-Quicki::Searcher.new.handle_req
+if $PROGRAM_NAME == __FILE__
+  Quicki::Searcher.new.handle_req
+end
