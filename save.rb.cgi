@@ -2,7 +2,7 @@
 
 module Quicki
   class Writer
-    MARK = "\263".b
+    MARK = "\uE000"
     LINK = /[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]+)+/
 
     def handle_req
@@ -56,8 +56,6 @@ module Quicki
              else
                text.tr("\r", "\n")
              end
-
-      text = text.delete(MARK)
 
       # <<WikiWord 형식이 있으면 WikiWord 페이지에 현재 페이지 백링크를 추가한다
       backlink_target = nil

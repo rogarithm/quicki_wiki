@@ -2,7 +2,7 @@
 
 module Quicki
   class Browser
-    MARK = "\263".b
+    MARK = "\uE000"
     LINK = /[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]+)+/
     PROTOCOL = /(?:http|ftp|mailto|file|gopher|telnet|news)/
     MONTHS = %w[January February March April May June July August September October November December]
@@ -20,15 +20,7 @@ module Quicki
       date = nil
       page_path = File.join("pages", page)
       if File.exist?(page_path)
-        source = File.binread(page_path)
-        if source.include?(MARK)
-          fields = source.split(MARK, -1)
-          mapped = {}
-          fields.each_slice(2) do |key, value|
-            mapped[key] = value
-          end
-          source = mapped["text"]
-        end
+        source = File.binread(page_path).force_encoding("UTF-8")
 
         body = render_wiki_doc(source.to_s)
         time = File.mtime(page_path)
@@ -73,7 +65,7 @@ module Quicki
         line.gsub!(/''(.*?)''/, '<em>\1</em>')
         line.gsub!(/\[Search\]/, "<form action=search.cgi><input type=text name=search size=40>\n   <input type=\"submit\" value=\"Search\"></form>")
         line.gsub!(LINK) { |match| as_anchor(match) }
-        marker_pattern = Regexp.new("#{Regexp.escape(MARK)}(\\d+)#{Regexp.escape(MARK)}".b)
+        marker_pattern = Regexp.new("#{Regexp.escape(MARK)}(\\d+)#{Regexp.escape(MARK)}")
         line.gsub!(marker_pattern) { in_place_url(in_place_urls, Regexp.last_match(1).to_i) }
 
         body << line << "\n"
