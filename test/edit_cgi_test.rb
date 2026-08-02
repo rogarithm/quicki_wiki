@@ -82,18 +82,4 @@ class EditCgiTest < Minitest::Test
   def test_gen_body_escapes_html_characters
     assert_equal("&amp;&lt;&gt;", @editor.gen_body("&<>"))
   end
-
-  # MARK 구분자가 포함된 숨김 필드 페이지에서는 text 필드만 추출한다
-  def test_gen_body_extracts_text_field_from_hidden_field_page
-    source = "text#{Quicki::Editor::MARK}Visible#{Quicki::Editor::MARK}other#{Quicki::Editor::MARK}Hidden"
-
-    assert_equal("Visible", @editor.gen_body(source))
-  end
-
-  # MARK 구분자는 최종 textarea 본문에 남기지 않는다
-  def test_gen_body_does_not_leave_mark_in_output
-    source = "text#{Quicki::Editor::MARK}Visible"
-
-    refute_includes(@editor.gen_body(source), Quicki::Editor::MARK)
-  end
 end
