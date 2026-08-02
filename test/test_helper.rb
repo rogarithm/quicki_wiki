@@ -16,34 +16,31 @@ load File.join(TEST_ROOT, "changes.rb.cgi")
 load File.join(TEST_ROOT, "refcount.rb.cgi")
 
 module QuickiTestHelpers
-  def with_env(vars)
-    old = {}
-    vars.each_key do |key|
-      old[key] = ENV.key?(key) ? ENV[key] : :__missing__
+  def with_env(test_env_vars)
+    env_vars = {}
+    # test_env_vars의 키 중 env_vars에 등록된 키가 있으면 복구 용도로 그 키값 쌍을 저장해둔다
+    test_env_vars.each_key do |k|
+      env_vars[k] = ENV[k] if ENV.key?(k)
     end
 
-    vars.each do |key, value|
-      if value.nil?
-        ENV.delete(key)
-      else
-        ENV[key] = value
-      end
+    # test_env_vars의 값으로 env 값을 설정한다
+    test_env_vars.each do |k, v|
+      ENV[k] = v
     end
 
     yield
   ensure
-    old.each do |key, value|
-      if value == :__missing__
-        ENV.delete(key)
-      else
-        ENV[key] = value
-      end
+    # 원래 env에 등록된 값을 복구한다
+    env_vars.each do |k, v|
+      ENV[k] = v
     end
   end
 
   def in_tmpdir
     Dir.mktmpdir("quicki-test") do |dir|
-      Dir.chdir(dir) { yield dir }
+      Dir.chdir(dir) do
+        yield dir
+      end
     end
   end
 
@@ -58,17 +55,16 @@ module QuickiTestHelpers
     end
   end
 
+  # 표준 입력으로부터 읽는 동작을 흉내낸다
+  # STDIN.read(ENV.fetch("CONTENT_LENGTH", "0").to_i)
+  # 표준 출력으로 content_length 환경변수에 설정된 길이만큼의 바이트를 읽어온다
   def capture_with_stdin(stdin_data = "")
-    output, err = capture_io do
-      STDIN.stub(:read, lambda { |length = nil|
-        length.nil? ? stdin_data : stdin_data.byteslice(0, length)
+    out, err = capture_io do
+      STDIN.stub(:read, lambda { |length|
+        stdin_data.byteslice(0, length)
       }) { yield }
     end
-    [output, err]
-  end
-
-  def with_stubbed_time(now)
-    Time.stub(:now, now) { yield }
+    [out, err]
   end
 
   def status_double(success)

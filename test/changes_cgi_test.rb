@@ -17,12 +17,10 @@ class ChangesCgiTest < Minitest::Test
         File.binwrite(doc, "skip")
       end
 
-      output = with_env("QUERY_STRING" => "", "CONTENT_LENGTH" => "0") do
-        capture_io { @viewer.handle_req }.first
-      end
+      out, _err = capture_io { @viewer.handle_req }
 
-      assert_includes(output, "WikiWord")
-      refute_includes(output, "not-a-wiki")
+      assert_includes(out, "WikiWord")
+      refute_includes(out, "not-a-wiki")
     end
   end
 
@@ -39,11 +37,9 @@ class ChangesCgiTest < Minitest::Test
         File.utime(Time.utc(2024, 1, 2), Time.utc(2024, 1, 2), doc)
       end
 
-      output = with_env("QUERY_STRING" => "", "CONTENT_LENGTH" => "0") do
-        capture_io { @viewer.handle_req }.first
-      end
+      out, _err = capture_io { @viewer.handle_req }
 
-      assert_operator(output.index("NewPage"), :<, output.index("OldPage"))
+      assert_operator(out.index("NewPage"), :<, out.index("OldPage"))
     end
   end
 
@@ -58,11 +54,11 @@ class ChangesCgiTest < Minitest::Test
         File.binwrite(doc, "2")
       end
 
-      output = with_env("QUERY_STRING" => "max=1", "CONTENT_LENGTH" => "0") do
-        capture_io { @viewer.handle_req }.first
+      out, _err = with_env("QUERY_STRING" => "max=1") do
+        capture_io { @viewer.handle_req }
       end
 
-      assert_equal(1, output.scan(/<dd><a href=wiki.cgi\?/).length)
+      assert_equal(1, out.scan(/<dd><a href=wiki.cgi\?/).length)
     end
   end
 
@@ -74,20 +70,24 @@ class ChangesCgiTest < Minitest::Test
         File.binwrite(doc, "body")
       end
 
-      output = with_env("QUERY_STRING" => "", "CONTENT_LENGTH" => "0") do
-        capture_io { @viewer.handle_req }.first
-      end
+      out, _err = capture_io { @viewer.handle_req }
 
-      assert_includes(output, "TITLE:Recent Changes")
-      assert_includes(output, "PAGE:http:changes.cgi")
-      assert_includes(output, "BODY:<dl>")
+      assert_includes(out, "TITLE:Recent Changes")
+      assert_includes(out, "PAGE:http:changes.cgi")
+      assert_includes(out, "BODY:<dl>")
     end
   end
 
   # 같은 날짜의 페이지들은 하나의 dt 아래 연속된 dd로 출력한다
   def test_gen_body_groups_pages_under_same_date
     time = Time.utc(2024, 1, 1, 0, 0, 0)
-    body = @viewer.gen_body([[time, "FirstPage"], [time, "SecondPage"]], 25)
+    body = @viewer.gen_body(
+      [
+        [time, "FirstPage"],
+        [time, "SecondPage"]
+      ],
+      25
+    )
 
     assert_equal(1, body.scan(/<dt>/).length)
     assert_equal(2, body.scan(/<dd><a href=wiki.cgi\?/).length)
@@ -95,7 +95,13 @@ class ChangesCgiTest < Minitest::Test
 
   # 날짜가 바뀌면 새 dt를 출력한다
   def test_gen_body_starts_new_group_when_date_changes
-    body = @viewer.gen_body([[Time.utc(2024, 1, 2), "NewPage"], [Time.utc(2024, 1, 1), "OldPage"]], 25)
+    body = @viewer.gen_body(
+      [
+        [Time.utc(2024, 1, 2), "NewPage"],
+        [Time.utc(2024, 1, 1), "OldPage"]
+      ],
+      25
+    )
 
     assert_equal(2, body.scan(/<dt>/).length)
   end
@@ -103,7 +109,13 @@ class ChangesCgiTest < Minitest::Test
   # 최대 max 개수만큼의 페이지를 출력한다
   def test_gen_body_limits_rows_to_max
     time = Time.utc(2024, 1, 1, 0, 0, 0)
-    body = @viewer.gen_body([[time, "FirstPage"], [time, "SecondPage"]], 1)
+    body = @viewer.gen_body(
+      [
+        [time, "FirstPage"],
+        [time, "SecondPage"]
+      ],
+      1
+    )
 
     assert_equal(1, body.scan(/<dd><a href=wiki.cgi\?/).length)
   end

@@ -179,22 +179,18 @@ class QuickiCoreTest < Minitest::Test
 
   # HTTP/1.0 상태줄을 포함한 응답 문자열을 만든다
   def test_make_resp_includes_http_status_line
-    response = with_stubbed_time(Time.utc(2024, 1, 2, 3, 4, 5)) do
-      make_resp("201 Created", body: "ok")
-    end
+    response = make_resp("201 Created", body: "ok")
 
     assert_match(/\AHTTP\/1\.0 201 Created\r\n/, response)
   end
 
   # 호출자가 넘긴 헤더를 응답에 병합한다
   def test_make_resp_merges_headers_sent_by_client
-    response = with_stubbed_time(Time.utc(2024, 1, 2, 3, 4, 5)) do
-      make_resp(
-        "200 OK",
-        {"Content-Type" => "text/html", "X-Test" => "yes"},
-        body: "ok"
-      )
-    end
+    response = make_resp(
+      "200 OK",
+      {"Content-Type" => "text/html", "X-Test" => "yes"},
+      body: "ok"
+    )
 
     assert_match("Content-Type: text/html", response)
     assert_match("X-Test: yes", response)
@@ -202,18 +198,14 @@ class QuickiCoreTest < Minitest::Test
 
   # body의 bytesize로 Content-Length를 계산한다
   def test_make_resp_computes_content_length_from_body_bytes
-    response = with_stubbed_time(Time.utc(2024, 1, 2, 3, 4, 5)) do
-      make_resp("200 OK", body: "한")
-    end
+    response = make_resp("200 OK", body: "한")
 
     assert_match("Content-Length: 3", response)
   end
 
   # 헤더와 본문 사이를 CRLF CRLF로 구분한다
   def test_make_resp_separates_headers_and_body_with_crlf
-    response = with_stubbed_time(Time.utc(2024, 1, 2, 3, 4, 5)) do
-      make_resp("200 OK", body: "ok")
-    end
+    response = make_resp("200 OK", body: "ok")
 
     assert_includes(response, "\r\n\r\nok")
   end

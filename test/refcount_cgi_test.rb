@@ -16,17 +16,17 @@ class RefcountCgiTest < Minitest::Test
         File.binwrite(doc, "WikiWord")
       end
 
-      output = with_env("QUERY_STRING" => "", "CONTENT_LENGTH" => "0") do
-        capture_io { @counter.handle_req }.first
+      out, _err = with_env("QUERY_STRING" => "") do
+        capture_io { @counter.handle_req }
       end
 
-      assert_includes(output, "WikiWord")
-      refute_includes(output, "not-a-wiki")
+      assert_includes(out, "WikiWord")
+      refute_includes(out, "not-a-wiki")
     end
   end
 
   # 각 페이지 파일 내용을 읽어 페이지명-본문 해시를 구성한다
-  def test_handle_req_reads_page_contents_and_renders_template
+  def test_load_pages_makes_hash_with_page_names_and_its_contents
     in_tmpdir do
       write_template("TITLE:$title\nPAGE:$page\nBODY:$body\n")
       make_wiki_doc("WikiWord") do |doc|
@@ -36,13 +36,10 @@ class RefcountCgiTest < Minitest::Test
         File.binwrite(doc, "")
       end
 
-      output = with_env("QUERY_STRING" => "", "CONTENT_LENGTH" => "0") do
-        capture_io { @counter.handle_req }.first
-      end
-
-      assert_includes(output, "TITLE:Page References")
-      assert_includes(output, "PAGE:http:pagerefs.cgi")
-      assert_includes(output, "<table border=0 cellspacing=0 cellpadding=0>")
+      assert_equal(
+        {"WikiWord"=>"MainTopic", "MainTopic"=>""},
+        @counter.load_pages(["WikiWord", "MainTopic"])
+      )
     end
   end
 

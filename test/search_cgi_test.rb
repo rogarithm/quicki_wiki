@@ -13,11 +13,11 @@ class SearchCgiTest < Minitest::Test
         File.binwrite(doc, "Wiki body")
       end
 
-      output = with_env("QUERY_STRING" => "search=Wiki", "CONTENT_LENGTH" => "0") do
-        capture_io { @searcher.handle_req }.first
+      out, _err = with_env("QUERY_STRING" => "search=Wiki") do
+        capture_io { @searcher.handle_req }
       end
 
-      assert_includes(output, "value=\"Wiki\"")
+      assert_includes(out, "value=\"Wiki\"")
     end
   end
 
@@ -29,11 +29,11 @@ class SearchCgiTest < Minitest::Test
         File.binwrite(doc, "wiki.org/path")
       end
 
-      output = with_env("QUERY_STRING" => "search=wiki.org%2Fpath", "CONTENT_LENGTH" => "0") do
-        capture_io { @searcher.handle_req }.first
+      out, _err = with_env("QUERY_STRING" => "search=wiki.org%2Fpath") do
+        capture_io { @searcher.handle_req }
       end
 
-      assert_includes(output, "value=\"wiki.org/path\"")
+      assert_includes(out, "value=\"wiki.org/path\"")
     end
   end
 
@@ -48,15 +48,15 @@ class SearchCgiTest < Minitest::Test
         File.binwrite(doc, "Wiki body")
       end
 
-      output = with_env("QUERY_STRING" => "search=Wiki", "CONTENT_LENGTH" => "0") do
-        capture_io { @searcher.handle_req }.first
+      out, _err = with_env("QUERY_STRING" => "search=Wiki") do
+        capture_io { @searcher.handle_req }
       end
 
-      assert_includes(output, "1 pages found out of 1 pages searched.")
+      assert_includes(out, "1 pages found out of 1 pages searched.")
     end
   end
 
-  # 검색 결과 수를 summary에 반영한다
+  # 검색 시 찾아본 위키 문서 수를 summary에 반영한다
   def test_handle_req_reflects_hit_count_in_summary
     in_tmpdir do
       write_template("SUMMARY:$summary\n")
@@ -67,11 +67,11 @@ class SearchCgiTest < Minitest::Test
         File.binwrite(doc, "No match")
       end
 
-      output = with_env("QUERY_STRING" => "search=Wiki", "CONTENT_LENGTH" => "0") do
-        capture_io { @searcher.handle_req }.first
+      out, _err = with_env("QUERY_STRING" => "search=Wiki") do
+        capture_io { @searcher.handle_req }
       end
 
-      assert_includes(output, "1 pages found out of 2 pages searched.")
+      assert_includes(out, "1 pages found out of 2 pages searched.")
     end
   end
 
@@ -83,11 +83,11 @@ class SearchCgiTest < Minitest::Test
         File.binwrite(doc, "Wiki body")
       end
 
-      output = with_env("QUERY_STRING" => "search=NoSuchNeedle", "CONTENT_LENGTH" => "0") do
-        capture_io { @searcher.handle_req }.first
+      out, _err = with_env("QUERY_STRING" => "search=NoSuchNeedle") do
+        capture_io { @searcher.handle_req }
       end
 
-      assert_includes(output, "No pages found out of 1 pages searched.")
+      assert_includes(out, "No pages found out of 1 pages searched.")
     end
   end
 
@@ -99,13 +99,13 @@ class SearchCgiTest < Minitest::Test
         File.binwrite(doc, "Wiki body")
       end
 
-      output = with_env("QUERY_STRING" => "search=Wiki", "CONTENT_LENGTH" => "0") do
-        capture_io { @searcher.handle_req }.first
+      out, _err = with_env("QUERY_STRING" => "search=Wiki") do
+        capture_io { @searcher.handle_req }
       end
 
-      assert_includes(output, "TITLE:Search Results")
-      assert_includes(output, "PAGE:WelcomeVisitors")
-      assert_includes(output, "BODY: <form action=search.cgi>")
+      assert_includes(out, "TITLE:Search Results")
+      assert_includes(out, "PAGE:WelcomeVisitors")
+      assert_includes(out, "BODY: <form action=search.cgi>")
     end
   end
 
@@ -119,7 +119,7 @@ class SearchCgiTest < Minitest::Test
 
   # 검색어를 input value에 그대로 반영한다
   def test_gen_body_reflects_search_target_in_input_value
-    body = @searcher.gen_body("Wiki", /\bWiki\b/i, {})
+    body = @searcher.gen_body("Wiki", /\b\w*Wiki\w*\b/i, {})
 
     assert_includes(body, 'value="Wiki"')
   end
@@ -136,7 +136,7 @@ class SearchCgiTest < Minitest::Test
 
   # 매칭이 하나도 없으면 검색 폼만 포함한 본문을 반환한다
   def test_gen_body_returns_only_search_form_when_no_match_exists
-    body = @searcher.gen_body("None", /None/, {"WikiWord" => "body"})
+    body = @searcher.gen_body("None", /\b\w*(None)\w*\b/i, {"WikiWord" => "body"})
 
     assert_includes(body, "<form action=search.cgi>")
     refute_includes(body, "<a href=wiki.cgi?")

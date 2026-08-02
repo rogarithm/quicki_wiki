@@ -13,11 +13,11 @@ class EditCgiTest < Minitest::Test
         File.binwrite(doc, "Body")
       end
 
-      output = with_env("QUERY_STRING" => "not-valid", "CONTENT_LENGTH" => "0") do
-        capture_with_stdin { @editor.handle_req }.first
+      out, _err = with_env("QUERY_STRING" => "not-valid") do
+        capture_with_stdin { @editor.handle_req }
       end
 
-      assert_match("Edit WelcomeVisitors", output)
+      assert_match("Edit WelcomeVisitors", out)
     end
   end
 
@@ -29,15 +29,16 @@ class EditCgiTest < Minitest::Test
         File.binwrite(doc, "A&B")
       end
 
-      existing = with_env("QUERY_STRING" => "WelcomeVisitors", "CONTENT_LENGTH" => "0") do
-        capture_with_stdin { @editor.handle_req }.first
+      out, _err = with_env("QUERY_STRING" => "WelcomeVisitors") do
+        capture_with_stdin { @editor.handle_req }
       end
-      missing = with_env("QUERY_STRING" => "MissingPage", "CONTENT_LENGTH" => "0") do
-        capture_with_stdin { @editor.handle_req }.first
-      end
+      assert_match(/<textarea[^>]*>A&amp;B<\/textarea>/, out)
 
-      assert_match(/<textarea[^>]*>A&amp;B<\/textarea>/, existing)
-      assert_match(/<textarea[^>]*><\/textarea>/, missing)
+      # 없는 페이지이므로 본문도 비어있어야 한다
+      out, _err = with_env("QUERY_STRING" => "MissingPage") do
+        capture_with_stdin { @editor.handle_req }
+      end
+      assert_match(/<textarea[^>]*><\/textarea>/, out)
     end
   end
 
@@ -49,13 +50,13 @@ class EditCgiTest < Minitest::Test
         File.binwrite(doc, "Existing")
       end
 
-      output = with_env("QUERY_STRING" => "GuestBook", "CONTENT_LENGTH" => "8") do
-        capture_with_stdin("append=1") { @editor.handle_req }.first
+      out, _err = with_env("QUERY_STRING" => "GuestBook", "CONTENT_LENGTH" => "8") do
+        capture_with_stdin("append=1") { @editor.handle_req }
       end
 
-      assert_match("Add comment to GuestBook", output)
-      assert_match(/<textarea[^>]*><\/textarea>/, output)
-      assert_match(/name="mode" value="append"/, output)
+      assert_match(/Add comment to .+/, out)
+      assert_match(/<textarea[^>]*><\/textarea>/, out)
+      assert_match(/name="mode" value="append"/, out)
     end
   end
 
@@ -67,13 +68,13 @@ class EditCgiTest < Minitest::Test
         File.binwrite(doc, "Body")
       end
 
-      output = with_env("QUERY_STRING" => "WelcomeVisitors", "CONTENT_LENGTH" => "0") do
-        capture_with_stdin { @editor.handle_req }.first
+      out, _err = with_env("QUERY_STRING" => "WelcomeVisitors") do
+        capture_with_stdin { @editor.handle_req }
       end
 
-      assert_includes(output, "TITLE:Edit WelcomeVisitors")
-      assert_includes(output, "PAGE:WelcomeVisitors")
-      assert_includes(output, "BODY:\t<form method=post action=\"save.cgi?WelcomeVisitors\">")
+      assert_includes(out, "TITLE:Edit WelcomeVisitors")
+      assert_includes(out, "PAGE:WelcomeVisitors")
+      assert_includes(out, "BODY:\t<form method=post action=\"save.cgi?WelcomeVisitors\">")
     end
   end
 

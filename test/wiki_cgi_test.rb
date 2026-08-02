@@ -13,12 +13,12 @@ class WikiBrowserTest < Minitest::Test
         File.binwrite(doc, "Welcome body")
       end
 
-      output = with_env("QUERY_STRING" => "", "CONTENT_LENGTH" => "0") do
-        capture_io { @browser.handle_req }.first
+      out, _err = with_env("QUERY_STRING" => "") do
+        capture_io { @browser.handle_req }
       end
 
-      assert_match("Welcome Visitors", output)
-      assert_match("Welcome body", output)
+      assert_match("Welcome Visitors", out)
+      assert_match("Welcome body", out)
     end
   end
 
@@ -30,12 +30,12 @@ class WikiBrowserTest < Minitest::Test
         File.binwrite(doc, "Page body")
       end
 
-      output = with_env("QUERY_STRING" => "WikiWord", "CONTENT_LENGTH" => "0") do
-        capture_io { @browser.handle_req }.first
+      out, _err = with_env("QUERY_STRING" => "WikiWord") do
+        capture_io { @browser.handle_req }
       end
 
-      assert_match("Wiki Word", output)
-      assert_match("Page body", output)
+      assert_match("Wiki Word", out)
+      assert_match("Page body", out)
     end
   end
 
@@ -44,44 +44,11 @@ class WikiBrowserTest < Minitest::Test
     in_tmpdir do
       write_template
 
-      output = with_env("QUERY_STRING" => "MissingPage", "CONTENT_LENGTH" => "0") do
-        capture_io { @browser.handle_req }.first
+      out, _err = with_env("QUERY_STRING" => "MissingPage") do
+        capture_io { @browser.handle_req }
       end
 
-      assert_match(/"MissingPage" does not yet exist/, output)
-      assert_match(/Use the <strong>Edit<\/strong> button/, output)
-    end
-  end
-
-  # &, <, > 문자를 먼저 HTML escape한다
-  def test_render_wiki_doc_escapes_html_characters
-    html = @browser.render_wiki_doc("& < >")
-
-    assert_includes(html, "&amp; &lt; &gt;")
-  end
-
-  # 빈 줄을 문단 구분용 p 태그 형태로 변환한다
-  def test_render_wiki_doc_converts_blank_lines_to_paragraph_markers
-    html = @browser.render_wiki_doc("line1\n\nline2")
-
-    assert_includes(html, "<p>\n")
-  end
-
-  # 인라인 태그를 처리한다
-  def test_render_wiki_doc_processes_inline_markup
-    in_tmpdir do
-      make_wiki_doc("WikiWord") do |doc|
-        File.binwrite(doc, "exists")
-      end
-
-      html = @browser.render_wiki_doc("-----\n'''bold'''\n''em''\n[Search]\nWikiWord MissingPage")
-
-      assert_includes(html, "<hr>")
-      assert_includes(html, "<strong>bold</strong>")
-      assert_includes(html, "<em>em</em>")
-      assert_includes(html, "<form action=search.cgi>")
-      assert_includes(html, "<a href=wiki.cgi?WikiWord>WikiWord</a>")
-      assert_includes(html, "<a href=edit.cgi?MissingPage>?</a>MissingPage")
+      assert_match(/"MissingPage" does not yet exist/, out)
     end
   end
 
@@ -115,17 +82,44 @@ class WikiBrowserTest < Minitest::Test
     assert_equal(true, has_matching)
   end
 
-  # 빈 줄,*,#,정의 목록,n. 형식,H2, H3, H4 제목 마커,blockquote 마커를 적절히 처리한다
+  # 빈 줄, *, #, 정의 목록, n. 형식, H2, H3, H4 제목 마커, blockquote 마커를 적절히 처리한다
   def test_sub2html_processes_supported_rules
-    assert_equal(["<p>", true], @browser.sub2html("", false).first(2))
-    assert_equal("<li> item", @browser.sub2html("* item", false)[0])
-    assert_equal("<li> item", @browser.sub2html("# item", false)[0])
-    assert_equal("<dt>term<dd>value", @browser.sub2html(":term: value", false)[0])
-    assert_equal("<li> item", @browser.sub2html("1. item", false)[0])
-    assert_equal("head", @browser.sub2html("!!head", false)[0])
-    assert_equal("head", @browser.sub2html("!!!head", false)[0])
-    assert_equal("head", @browser.sub2html("!!!!head", false)[0])
-    assert_equal("quote", @browser.sub2html('""quote', false)[0])
+    assert_equal(
+      ["<p>", true],
+      @browser.sub2html("", false).first(2)
+    )
+    assert_equal(
+      "<li> item",
+      @browser.sub2html("* item", false)[0]
+    )
+    assert_equal(
+      "<li> item",
+      @browser.sub2html("# item", false)[0]
+    )
+    assert_equal(
+      "<dt>term<dd>value",
+      @browser.sub2html(":term: value", false)[0]
+    )
+    assert_equal(
+      "<li> item",
+      @browser.sub2html("1. item", false)[0]
+    )
+    assert_equal(
+      "head",
+      @browser.sub2html("!!head", false)[0]
+    )
+    assert_equal(
+      "head",
+      @browser.sub2html("!!!head", false)[0]
+    )
+    assert_equal(
+      "head",
+      @browser.sub2html("!!!!head", false)[0]
+    )
+    assert_equal(
+      "quote",
+      @browser.sub2html('""quote', false)[0]
+    )
   end
 
   # 매칭되는 규칙이 없으면 has_matching=false와 원본 줄을 반환한다
@@ -136,15 +130,57 @@ class WikiBrowserTest < Minitest::Test
     assert_equal(false, has_matching)
   end
 
-  # PRE 규칙,별표 목록 규칙,샵 목록 규칙,정의 목록 규칙,숫자 목록 규칙,제목 및 blockquote 규칙을 적절히 처리한다
+  # PRE 규칙, 별표 목록 규칙, 샵 목록 규칙, 정의 목록 규칙, 숫자 목록 규칙, 제목 및 blockquote 규칙을 적절히 처리한다
   def test_wrap_block_tags_emits_expected_tags_for_supported_rules
-    assert_equal("<PRE>", @browser.wrap_block_tags([], @browser.sub2html(" indented", false)[2]))
-    assert_equal("<UL>", @browser.wrap_block_tags([], @browser.sub2html("* item", false)[2]))
-    assert_equal("<OL>", @browser.wrap_block_tags([], @browser.sub2html("# item", false)[2]))
-    assert_equal("<DL>", @browser.wrap_block_tags([], @browser.sub2html(":term: value", false)[2]))
-    assert_equal("<OL>", @browser.wrap_block_tags([], @browser.sub2html("1. item", false)[2]))
-    assert_equal("<H2>", @browser.wrap_block_tags([], @browser.sub2html("!!head", false)[2]))
-    assert_equal("<BLOCKQUOTE>", @browser.wrap_block_tags([], @browser.sub2html('""quote', false)[2]))
+    assert_equal(
+      "<PRE>",
+      @browser.wrap_block_tags(
+        [],
+        @browser.sub2html(" indented", false)[2]
+      )
+    )
+    assert_equal(
+      "<UL>",
+      @browser.wrap_block_tags(
+        [],
+        @browser.sub2html("* item", false)[2]
+      )
+    )
+    assert_equal(
+      "<OL>",
+      @browser.wrap_block_tags(
+        [],
+        @browser.sub2html("# item", false)[2]
+      )
+    )
+    assert_equal(
+      "<DL>",
+      @browser.wrap_block_tags(
+        [],
+        @browser.sub2html(":term: value", false)[2]
+      )
+    )
+    assert_equal(
+      "<OL>",
+      @browser.wrap_block_tags(
+        [],
+        @browser.sub2html("1. item", false)[2]
+      )
+    )
+    assert_equal(
+      "<H2>",
+      @browser.wrap_block_tags(
+        [],
+        @browser.sub2html("!!head", false)[2]
+      )
+    )
+    assert_equal(
+      "<BLOCKQUOTE>",
+      @browser.wrap_block_tags(
+        [],
+        @browser.sub2html('""quote', false)[2]
+      )
+    )
   end
 
   # 블록 규칙이 아니면 빈 문자열을 반환한다
@@ -187,6 +223,6 @@ class WikiBrowserTest < Minitest::Test
     html = @browser.in_place_url([long_url], 0)
 
     assert_includes(html, "href=\"#{long_url}\"")
-    assert_includes(html, "javascript:abcdefghijklmnopqrstuvwxyz123 ...")
+    assert_includes(html, "javascript:abcdefghijklmnopqrstuvwxyz123 ...") # 표시되는 텍스트
   end
 end

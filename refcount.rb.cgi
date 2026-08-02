@@ -8,7 +8,7 @@ module Quicki
     def handle_req
       files = Dir.children("pages").select { |name| name.match?(/\A#{LINK}\z/) }
       # 파일명=>파일 내용 형식의 해시를 만든다
-      pages = files.to_h { |file| [file, File.binread(File.join("pages", file))] }
+      pages = load_pages(files)
 
       par = {}
       par["summary"] = ""
@@ -25,6 +25,10 @@ module Quicki
       $stdout.sync = true
       print "Content-type: text/html; charset=UTF-8\n\n"
       print template
+    end
+
+    def load_pages(files)
+      files.to_h { |file| [file, File.binread(File.join("pages", file))] }
     end
 
     def gen_body(pages)

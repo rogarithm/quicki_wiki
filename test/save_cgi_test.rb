@@ -7,13 +7,13 @@ class SaveCgiTest < Minitest::Test
 
   # QUERY_STRING이 유효한 WikiWord가 아니면 BadSaveName 예외를 발생시킨다
   def test_handle_req_raises_for_invalid_query_string
-    error = with_env("QUERY_STRING" => "invalid-name", "CONTENT_LENGTH" => "0") do
+    err = with_env("QUERY_STRING" => "invalid-name") do
       assert_raises(RuntimeError) do
-        capture_with_stdin { @writer.handle_req }
+        @writer.handle_req
       end
     end
 
-    assert_equal("BadSaveName\n", error.message)
+    assert_equal("BadSaveName\n", err.message)
   end
 
   # CONTENT_LENGTH만큼만 stdin을 읽어 저장 입력으로 사용한다
@@ -22,16 +22,15 @@ class SaveCgiTest < Minitest::Test
       make_wiki_doc("SavePage") do |doc|
         File.binwrite(doc, "old")
       end
-      observed_length = nil
-      @writer.stub(:gen_body, lambda { |raw|
-        observed_length = raw.bytesize
+      # gen_body 구현을 흉내내서 입력 길이가 실제로 CONTENT_LENGTH만큼인지 확인한다
+      observed_length = nil # 확인할 입력 길이값을 저장한다
+      @writer.stub(:gen_body, lambda { |input|
+        observed_length = input.bytesize
         {"Text" => "saved", "mode" => "edit"}
       }) do
-        @writer.stub(:gen_text, ["saved", nil, "w"]) do
-          @writer.stub(:load, true) do
-            with_env("QUERY_STRING" => "SavePage", "CONTENT_LENGTH" => "4") do
-              capture_with_stdin("1234ignored") { @writer.handle_req }
-            end
+        @writer.stub(:load, true) do
+          with_env("QUERY_STRING" => "SavePage", "CONTENT_LENGTH" => "4") do
+            capture_with_stdin("1234ignored") { @writer.handle_req }
           end
         end
       end
@@ -94,6 +93,13 @@ class SaveCgiTest < Minitest::Test
     assert_equal({"Text" => "A&B One"}, body)
   end
 
+  # 변환된 본문, 백링크 대상, 파일 모드를 함께 반환한다
+  def test_gen_text_returns_text_backlink_and_file_mode
+    result = @writer.gen_text("Text" => "Hello", "mode" => "edit")
+
+    assert_equal(["Hello", nil, "w"], result)
+  end
+
   # 본문의 줄바꿈을 처리한다
   def test_gen_text_normalizes_line_endings
     # \n이 이미 있는 경우 \r만 제거
@@ -119,12 +125,5 @@ class SaveCgiTest < Minitest::Test
 
     assert_equal("\n----\n\nAppended", text)
     assert_equal("a", mode)
-  end
-
-  # 변환된 본문, 백링크 대상, 파일 모드를 함께 반환한다
-  def test_gen_text_returns_text_backlink_and_file_mode
-    result = @writer.gen_text("Text" => "Hello", "mode" => "edit")
-
-    assert_equal(["Hello", nil, "w"], result)
   end
 end
