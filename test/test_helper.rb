@@ -8,12 +8,12 @@ require "open3"
 TEST_ROOT = File.expand_path("..", __dir__)
 
 load File.join(TEST_ROOT, "quicki.rb")
-load File.join(TEST_ROOT, "wiki.rb.cgi")
-load File.join(TEST_ROOT, "edit.rb.cgi")
-load File.join(TEST_ROOT, "save.rb.cgi")
-load File.join(TEST_ROOT, "search.rb.cgi")
-load File.join(TEST_ROOT, "changes.rb.cgi")
-load File.join(TEST_ROOT, "refcount.rb.cgi")
+load File.join(TEST_ROOT, "wiki.cgi")
+load File.join(TEST_ROOT, "edit.cgi")
+load File.join(TEST_ROOT, "save.cgi")
+load File.join(TEST_ROOT, "search.cgi")
+load File.join(TEST_ROOT, "changes.cgi")
+load File.join(TEST_ROOT, "refcount.cgi")
 
 module QuickiTestHelpers
   def with_env(test_env_vars)
