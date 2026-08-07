@@ -74,6 +74,30 @@ module QuickiTestHelpers
   end
 end
 
+class Object
+  def stub name, val_or_callable, &block
+    new_name = "__stub__#{name}"
+
+    metaclass = class << self; self; end
+
+    metaclass.send :alias_method, new_name, name
+
+    metaclass.send :define_method, name do |*args, **kwargs, &blk|
+      if val_or_callable.respond_to?(:call)
+        val_or_callable.call(*args, **kwargs, &blk)
+      else
+        val_or_callable
+      end
+    end
+
+    block.call(self)
+  ensure
+    metaclass.send :undef_method, name
+    metaclass.send :alias_method, name, new_name
+    metaclass.send :undef_method, new_name
+  end
+end
+
 class Minitest::Test
   include QuickiTestHelpers
 end

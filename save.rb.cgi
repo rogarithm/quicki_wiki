@@ -25,7 +25,8 @@ module Quicki
         file.write(text)
       end
 
-      load "./wiki.rb.cgi", true
+      print "Status: 302 Found\n"
+      print "Location: wiki.cgi?#{page}\n\n"
     end
 
     def gen_body(input)
