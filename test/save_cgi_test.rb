@@ -28,10 +28,8 @@ class SaveCgiTest < Minitest::Test
         observed_length = input.bytesize
         {"Text" => "saved", "mode" => "edit"}
       }) do
-        @writer.stub(:load, true) do
-          with_env("QUERY_STRING" => "SavePage", "CONTENT_LENGTH" => "4") do
-            capture_with_stdin("1234ignored") { @writer.handle_req }
-          end
+        with_env("QUERY_STRING" => "SavePage", "CONTENT_LENGTH" => "4") do
+          capture_with_stdin("1234ignored") { @writer.handle_req }
         end
       end
 
@@ -49,33 +47,26 @@ class SaveCgiTest < Minitest::Test
         File.binwrite(doc, "topic")
       end
 
-      @writer.stub(:load, true) do
-        with_env("QUERY_STRING" => "SaveBacklink", "CONTENT_LENGTH" => "34") do
-          capture_with_stdin("Text=Before+%3C%3CMainTopic&mode=edit") { @writer.handle_req }
-        end
+      with_env("QUERY_STRING" => "SaveBacklink", "CONTENT_LENGTH" => "34") do
+        capture_with_stdin("Text=Before+%3C%3CMainTopic&mode=edit") { @writer.handle_req }
       end
 
       assert_equal("topic\n----\nSaveBacklink", File.binread("pages/MainTopic"))
     end
   end
 
-  # 저장 후 wiki.rb.cgi를 다시 로드해 렌더링을 이어서 수행한다
-  def test_handle_req_loads_wiki_renderer_after_saving
+  # 저장 후 브라우저가 페이지 보기 화면으로 이동하도록 redirect 헤더를 출력한다
+  def test_handle_req_redirects_to_wiki_after_saving
     in_tmpdir do
       make_wiki_doc("SavePage") do |doc|
         File.binwrite(doc, "old")
       end
-      called = false
 
-      @writer.stub(:load, lambda { |_path, _wrap|
-        called = true
-      }) do
-        with_env("QUERY_STRING" => "SavePage", "CONTENT_LENGTH" => "24") do
-          capture_with_stdin("Text=hello&mode=edit") { @writer.handle_req }
-        end
+      out, _err = with_env("QUERY_STRING" => "SavePage", "CONTENT_LENGTH" => "20") do
+        capture_with_stdin("Text=hello&mode=edit") { @writer.handle_req }
       end
 
-      assert_equal(true, called)
+      assert_equal("Status: 302 Found\nLocation: wiki.cgi?SavePage\n\n", out)
     end
   end
 
