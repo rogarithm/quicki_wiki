@@ -94,19 +94,19 @@ module Quicki
     def sub2html(line, has_matching)
       rules = [
         # pattern, replace
-        [/^\s*$/, "<p>"],
+        [/^\s*$/, ->(_) { "<p>" }],
         # match만 하고 치환은 하지 않는다.
         # emit_code 연산 시 이 rules에 포함된 패턴만 체크하기 때문에,
         # emit_code용 rule을 현재 rule이 모두 포함해야 한다
-        [/^\s/, nil],
-        [/^(\*+)/, "<li>"],
-        [/^(\#+)/, "<li>"],
+        [/^\s/, ->(m) { m }],
+        [/^(\*+)/, ->(_) { "<li>" }],
+        [/^(\#+)/, ->(_) { "<li>" }],
         [/^(:+)(.+?):( +)/, ->(m) { "<dt>#{m[2]}<dd>" }],
-        [/^(\d+)\./, "<li>"],
-        [/^!!!!/, ""],
-        [/^!!!/, ""],
-        [/^!!/, ""],
-        [/^\"\"/, ""],
+        [/^(\d+)\./, ->(_) { "<li>" }],
+        [/^!!!!/, ->(_) { "" }],
+        [/^!!!/, ->(_) { "" }],
+        [/^!!/, ->(_) { "" }],
+        [/^\"\"/, ->(_) { "" }],
       ]
 
       rule_n_match = rules.filter_map {|r|
@@ -118,13 +118,7 @@ module Quicki
       if rule_n_match
         has_matching = true
         pat, re, _ = rule_n_match
-        line = if re.nil? # 치환하면 안되는 경우는 여기서 처리한다
-                 line
-               elsif re.respond_to?(:call)
-                 line.sub(pat) { re.call(Regexp.last_match) }
-               else
-                 line.sub(pat, re)
-               end
+        line = line.sub(pat) { re.call(Regexp.last_match) }
       end
       [line, has_matching, rule_n_match]
     end
@@ -132,15 +126,15 @@ module Quicki
     def wrap_block_tags(codes, rule_n_match)
       rules = [
         # pattern, code, depth
-        [/^\s/, "PRE", 1],
+        [/^\s/, "PRE", ->(_) { 1 }],
         [/^(\*+)/, "UL", ->(mat) {mat[1].length}],
         [/^(\#+)/, "OL", ->(mat) {mat[1].length}],
         [/^(:+)(.+?):( +)/, "DL", ->(mat) {mat[1].length}],
-        [/^(\d+)\./, "OL", 1],
-        [/^!!!!/, "H4", 1],
-        [/^!!!/, "H3", 1],
-        [/^!!/, "H2", 1],
-        [/^\"\"/, "BLOCKQUOTE", 1],
+        [/^(\d+)\./, "OL", ->(_) { 1 }],
+        [/^!!!!/, "H4", ->(_) { 1 }],
+        [/^!!!/, "H3", ->(_) { 1 }],
+        [/^!!/, "H2", ->(_) { 1 }],
+        [/^\"\"/, "BLOCKQUOTE", ->(_) { 1 }],
       ]
       return "" unless rule_n_match
 
@@ -149,11 +143,7 @@ module Quicki
       return "" unless r
 
       _, code, depth = r
-      if depth.respond_to?(:call)
-        emit_code(codes, code, depth.call(mat))
-      else
-        emit_code(codes, code, depth)
-      end
+      emit_code(codes, code, depth.call(mat))
     end
 
     def emit_code(codes, code, depth)
