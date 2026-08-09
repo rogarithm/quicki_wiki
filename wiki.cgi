@@ -78,14 +78,20 @@ module Quicki
     def extract_in_place_urls(in_place_urls, line)
       index = 0
 
-      while line.sub!(/\b(javascript):\S.*/, "#{MARK}#{index}#{MARK}")
-        in_place_urls[index] = Regexp.last_match(0)
+      inline_js_url = /\b(javascript):\S.*/
+      line = line.gsub(inline_js_url) do |match| # match에 매칭된 값이 들어간다
+        current_idx = index
         index += 1
+        in_place_urls[current_idx] = match
+        "#{MARK}#{current_idx}#{MARK}" # 이 값으로 치환한다
       end
 
-      while line.sub!(/\b#{PROTOCOL.source}:[^\s<>\[\]"'()]*[^\s<>\[\]"'(),.?]/, "#{MARK}#{index}#{MARK}")
-        in_place_urls[index] = Regexp.last_match(0)
+      plain_url = /\b#{PROTOCOL.source}:[^\s<>\[\]"'()]*[^\s<>\[\]"'(),.?]/
+      line = line.gsub(plain_url) do |match|
+        current_idx = index
         index += 1
+        in_place_urls[current_idx] = match
+        "#{MARK}#{current_idx}#{MARK}"
       end
 
       [in_place_urls, line]
