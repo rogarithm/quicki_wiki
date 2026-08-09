@@ -1,167 +1,197 @@
-#! /usr/bin/perl
-# Copyright 1994-2000, Cunningham & Cunningham, Inc.
-# in collaboration with Dave W. Smith
-# Open Source for personal use only.
-# ... and then only
-# with the understanding that the owner(s) cannot be
-# responsible for any behavior of the program or
-# any damages that it may cause. See LICENSE.TXT
+#!/usr/bin/env ruby
 
-#use strict;
+module Quicki
+  class Browser
+    MARK = "\uE000"
+    LINK = /[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]+)+/
+    PROTOCOL = /(?:http|ftp|mailto|file|gopher|telnet|news)/
+    MONTHS = %w[January February March April May June July August September October November December]
 
-$|++;  # OUTPUT_AUTOFLUSH (if $| is non-zero)
-print "Content-type: text/html; charset=UTF-8\n\n";
+    def handle_req
+      $stdout.sync = true
+      print "Content-type: text/html; charset=UTF-8\n\n"
 
-my $mark = "\263";
-my $link = "[A-Z][a-z0-9]+([A-Z][a-z0-9]+)+";
+      page = ENV.fetch("QUERY_STRING", "")[/\A(#{LINK})\z/, 1] || "WelcomeVisitors"
 
-my $page = $ENV{QUERY_STRING} =~ /^($link)$/
- ? $1
- : "WelcomeVisitors";  # $& is the last match
- 
-my %par;
-$par{page} = $page;
-$par{title} = $page;
-$par{title} =~ s/(.)([A-Z])/$1 $2/g;
+      par = {}
+      par["page"] = page
+      par["title"] = page.gsub(/(.)([A-Z])/, '\1 \2')
 
-my $body, $date;
-if ( -e "pages/$page" ) {
- open(F, "pages/$page") or die "$page: $!";
- my $nl = $/; undef $/;
- $_ = <F>;  # redone from line-by-line read
- close(F);
- if ( /$mark/ ) {
-  my %bla = split /$mark/, $_ ;
-  $_ = $bla{text};  # convert hidden-field page to plain
-  }  # if-part same as in edit
- $/ = $nl;
+      date = nil
+      page_path = File.join("pages", page)
+      if File.exist?(page_path)
+        source = File.binread(page_path).force_encoding("UTF-8")
 
- $body = &FormatBody($_);
- $date = &mdy (-M "pages/$page");
+        body = render_wiki_doc(source.to_s)
+        time = File.mtime(page_path)
+        date = "#{MONTHS[time.month - 1]} #{time.day}, #{time.year}"
+      else
+        body = "  \"#{page}\" does not yet exist. <BR>\n" \
+          "  Use the <strong>Edit</strong> button to create it.\n"
+      end
 
- } else {
- $body = << "";
-  "$page" does not yet exist. <BR>
-  Use the <strong>Edit</strong> button to create it.
+      par["summary"] = " -- Last edited #{date}" if date
+      par["body"] = body
+      par["action"] = " <form method=post action=\"edit.cgi?#{page}\">\n" \
+        " <input type=submit value=\" Edit \">\n" \
+        " </form>\n"
 
-}
+      template = File.binread("template.html")
+      template.gsub!(/\$(\w+)/) { par.fetch(Regexp.last_match(1), "") }
+      print template
+    end
 
-$par{summary} = " -- Last edited $date" if $date;
-$par{body} = $body;
-$par{action} = << "";
- <form method=post action="edit.cgi?$page">
- <input type=submit value=" Edit ">
- </form>
+    def render_wiki_doc(source)
+      codes = []
+      in_place_urls = []
+      body = +""
+      escaped = source.gsub("&", "&amp;").gsub("<", "&lt;").gsub(">", "&gt;")
 
-open (T, 'template.html') || die "template.html: $!";
-undef $/;  # $nl still valid
-$_ = <T>;
-close (T);
-s/\$(\w+)/defined($par{$1}) ? $par{$1} : ''/geo;
-print;
-$/ = $nl;
+      escaped.split(/\n/).each do |line|
+        in_place_urls, line = extract_in_place_urls(in_place_urls, line)
 
-# ---
+        has_matching = false
+        line.sub!(/^\t+/, "")
 
-sub FormatBody {
- local $_ = shift @_;
- @code= ();
- my $body = '';
- s/&/&amp;/g;
- s/</&lt;/g;
- s/>/&gt;/g;
+        line, has_matching, rule_n_match = sub2html(line, has_matching)
 
- my $hnum = 0;  # initialized for AsHiddenLink
- my $protocol = "(?:http|ftp|mailto|file|gopher|telnet|news)";
- foreach (split(/\n/, $_)) {  # -v- do each explicit souce row
+        body << wrap_block_tags(codes, rule_n_match)
 
-  $InPlaceUrl=0;
-  while (s/\b(javascript):\S.*/$mark$InPlaceUrl$mark/) {
-   $InPlaceUrl[$InPlaceUrl++] = $&
-   }
-  while (s/\b$protocol:[^\s\<\>\[\]"'\(\)]*[^\s\<\>\[\]"'\(\)\,\.\?]/$mark$InPlaceUrl$mark/) {
-   $InPlaceUrl[$InPlaceUrl++] = $&
-   }
+        # 블록 규칙에 매칭되지 않는 경우, 열린 블록을 모두 닫는다
+        body << emit_code(codes, "", 0) unless has_matching
 
-# -v- emitcode block-tag section
-  $code = '';
-  s/^\t+//;  # legacy pages with tab indented lists
-  s/^\s*$/<p>/    && ($code = "...");
-  /^\s/           && ($body .= &EmitCode('PRE', 1));
+        line.sub!(/^-----*/, "<hr>")
+        line.gsub!(/'''(.*?)'''/, '<strong>\1</strong>')
+        line.gsub!(/''(.*?)''/, '<em>\1</em>')
+        line.gsub!(/\[Search\]/, "<form action=search.cgi><input type=text name=search size=40>\n   <input type=\"submit\" value=\"Search\"></form>")
+        line.gsub!(LINK) { |match| as_anchor(match) }
+        marker_pattern = Regexp.new("#{Regexp.escape(MARK)}(\\d+)#{Regexp.escape(MARK)}")
+        line.gsub!(marker_pattern) { in_place_url(in_place_urls, Regexp.last_match(1).to_i) }
 
-# - new list versions take left-edge multiple * or #
-  s/^(\*+)/<li>/  && ($body .= &EmitCode('UL', length $1));
-  s/^(\#+)/<li>/  && ($body .= &EmitCode('OL', length $1));
-# - allow left-edge : version of definition list, non-tabbed, non-greedy
-  s/^(:+)(.+?):( +)/<dt>$2<dd>/  && ($body .= &EmitCode(DL, length $1));
-# - allow and transform literal "n." ordered lists, left-edge, one level
-  s/^(\d+)\./<li>/  && ($body .= &EmitCode(OL, 1));
+        body << line << "\n"
+      end
 
-  s/^!!!!//       && ($body .= &EmitCode('H4', 1));
-  s/^!!!//        && ($body .= &EmitCode('H3', 1));
-  s/^!!//         && ($body .= &EmitCode('H2', 1));
-  s/^\"\"//       && ($body .= &EmitCode('BLOCKQUOTE', 1));
+      body << emit_code(codes, "", 0)
+      body
+    end
 
-  $code  || ($body .= &EmitCode('', 0));
+    def extract_in_place_urls(in_place_urls, line)
+      index = 0
 
-# -v- inline tag section
-  s/^-----*/<hr>/;
+      while line.sub!(/\b(javascript):\S.*/, "#{MARK}#{index}#{MARK}")
+        in_place_urls[index] = Regexp.last_match(0)
+        index += 1
+      end
 
-  s/'{3}(.*?)'{3}/<strong>$1<\/strong>/g;
-  s/'{2}(.*?)'{2}/<em>$1<\/em>/g;
+      while line.sub!(/\b#{PROTOCOL.source}:[^\s<>\[\]"'()]*[^\s<>\[\]"'(),.?]/, "#{MARK}#{index}#{MARK}")
+        in_place_urls[index] = Regexp.last_match(0)
+        index += 1
+      end
 
-  s/\[Search\]/<form action=search.cgi><input type=text name=search size=40>
-   <input type="submit" value="Search"><\/form>/g;
+      [in_place_urls, line]
+    end
 
-  s/\b$link\b/&AsAnchor($&)/geo;  # $& = entire matched string
-  s/$mark(\d+)$mark/&InPlaceUrl($1)/geo;
+    def sub2html(line, has_matching)
+      rules = [
+        # pattern, replace
+        [/^\s*$/, "<p>"],
+        # match만 하고 치환은 하지 않는다.
+        # emit_code 연산 시 이 rules에 포함된 패턴만 체크하기 때문에,
+        # emit_code용 rule을 현재 rule이 모두 포함해야 한다
+        [/^\s/, nil],
+        [/^(\*+)/, "<li>"],
+        [/^(\#+)/, "<li>"],
+        [/^(:+)(.+?):( +)/, ->(m) { "<dt>#{m[2]}<dd>" }],
+        [/^(\d+)\./, "<li>"],
+        [/^!!!!/, ""],
+        [/^!!!/, ""],
+        [/^!!/, ""],
+        [/^\"\"/, ""],
+      ]
 
-  $body .= "$_\n";
-  }  #-- end foreach
+      rule_n_match = rules.filter_map {|r|
+        pat = r[0]
+        mat = pat.match(line)
+        mat ? [r, mat].flatten! : nil
+      }.first
 
- $body .= &EmitCode("", 0);
- return $body;
- }
+      if rule_n_match
+        has_matching = true
+        pat, re, _ = rule_n_match
+        line = if re.nil? # 치환하면 안되는 경우는 여기서 처리한다
+                 line
+               elsif re.respond_to?(:call)
+                 line.sub(pat) { re.call(Regexp.last_match) }
+               else
+                 line.sub(pat, re)
+               end
+      end
+      [line, has_matching, rule_n_match]
+    end
 
-sub EmitCode {
- my $depth;
- ($code, $depth) = @_;
- my $tags = '';
- while (@code > $depth) {
-  $tags .= "</" . (pop @code) . ">\n<p>";
-  }
- while (@code < $depth) {
-  push @code, $code;
-  $tags .= "<$code>";
-  }
- if ($code[$#code] ne $code) {
-  $tags .= "</$code[$#code]>\n<$code>";  # split with \n
-  $code[$#code] = $code;
-  }
- return $tags;
- }
+    def wrap_block_tags(codes, rule_n_match)
+      rules = [
+        # pattern, code, depth
+        [/^\s/, "PRE", 1],
+        [/^(\*+)/, "UL", ->(mat) {mat[1].length}],
+        [/^(\#+)/, "OL", ->(mat) {mat[1].length}],
+        [/^(:+)(.+?):( +)/, "DL", ->(mat) {mat[1].length}],
+        [/^(\d+)\./, "OL", 1],
+        [/^!!!!/, "H4", 1],
+        [/^!!!/, "H3", 1],
+        [/^!!/, "H2", 1],
+        [/^\"\"/, "BLOCKQUOTE", 1],
+      ]
+      return "" unless rule_n_match
 
-sub AsAnchor {
- my $title = shift @_;
- -e "pages/$title"
-  ? "<a href=wiki.cgi?$title>$title<\/a>"
-  : "<a href=edit.cgi?$title>?<\/a>$title";
- }
+      pat, _, mat = rule_n_match
+      r = rules.find {|r| r[0] == pat}
+      return "" unless r
 
-sub InPlaceUrl {
- my $num = shift @_;
- my $ref = $InPlaceUrl[$num];
- $ref =~ s/^(javascript.{30}).*/$1 .../;
- $ref =~ /\.(gif|jpeg|jpg|png)$/i
-  ? "<img src=\"$ref\">"
-  : "<a href=\"$InPlaceUrl[$num]\">$ref<\/a>";
- }
+      _, code, depth = r
+      if depth.respond_to?(:call)
+        emit_code(codes, code, depth.call(mat))
+      else
+        emit_code(codes, code, depth)
+      end
+    end
 
-sub mdy {
- my $time = shift @_;
- my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($^T - ($time * 24 * 60 * 60));
- my $month = ('January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December')[$mon];
-  $year += 1900 if $year < 1900;
- return "$month $mday, $year";
- }
+    def emit_code(codes, code, depth)
+      tags = +""
+      while codes.length > depth
+        tags << "</#{codes[-1]}>\n<p>"
+        codes.pop
+      end
+      while codes.length < depth
+        tags << "<#{code}>"
+        codes << code
+      end
+      if codes[-1].to_s != code
+        tags << "</#{codes[-1]}>\n<#{code}>"
+        codes[-1] = code
+      end
+      tags
+    end
+
+    def as_anchor(title)
+      if File.exist?(File.join("pages", title))
+        "<a href=wiki.cgi?#{title}>#{title}</a>"
+      else
+        "<a href=edit.cgi?#{title}>?</a>#{title}"
+      end
+    end
+
+    def in_place_url(in_place_urls, index)
+      ref = in_place_urls[index].sub(/^(javascript.{30}).*/, '\1 ...')
+      if ref.match?(/\.(gif|jpeg|jpg|png)\z/i)
+        "<img src=\"#{ref}\">"
+      else
+        "<a href=\"#{in_place_urls[index]}\">#{ref}</a>"
+      end
+    end
+  end
+end
+
+if $PROGRAM_NAME == __FILE__
+  Quicki::Browser.new.handle_req
+end

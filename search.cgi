@@ -1,64 +1,80 @@
-#! /usr/bin/perl -w
-# Copyright 1994-2000, Cunningham & Cunningham, Inc.
-# in collaboration with Dave W. Smith
-# Open Source for personal use only.
-# ... and then only
-# with the understanding that the owner(s) cannot be
-# responsible for any behavior of the program or
-# any damages that it may cause. See LICENSE.TXT
+#!/usr/bin/env ruby
 
-# use strict;
-$|++;
-print "Content-type: text/html; charset=UTF-8\n\n";
+module Quicki
+  class Searcher
+    LINK = /\A[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]+)+\z/
 
-my $link = "[A-Z][a-z0-9]+([A-Z][a-z0-9]+)+";
+    def handle_req
+      target = ENV.fetch("QUERY_STRING", "")[/search=([^&]*)/, 1] # [] 두번째 인자인 1은 ()로 캡쳐한 값만 가져온다
+                 .to_s
+      target = target.gsub("+", " ").gsub(/%(..)/) do
+        m = Regexp.last_match(1)
+        [m.hex].pack("C")
+      end
 
-my ($target) = $ENV{QUERY_STRING} =~ /search=([^\&]*)/;
-$target =~ s/\+/ /g;
-$target =~ s/\%(..)/pack('C', hex($1))/geo;
+      pat = target.gsub(/[+?.*()\[\]{}|\\]/) { |char| "\\#{char}" }
+      regex = /\b\w*(#{pat})\w*\b/i
 
-my $pat = $target;
-$pat =~ s/[+?.*()[\]{}|\\]/\\$&/g;
-$pat = "\\b\\w*($pat)\\w*\\b";
+      target = target.gsub('"', "&quot;")
 
-$target =~s/"/&quot;/g;
-my $body = <<EOF;
+      files = Dir.children("pages").select { |name| name.match?(LINK) }.sort
+      pages = files.to_h { |file| [file, File.binread(File.join("pages", file))] }
+      hits = count_hits(regex, pages)
+      body = gen_body(target, regex, pages)
+
+      par = {}
+      par["summary"] = "#{hits.zero? ? 'No' : hits} pages found out of #{files.length} pages searched."
+      par["title"] = "Search Results"
+      par["page"] = "WelcomeVisitors"
+      par["body"] = body
+
+      template = File.binread("template.html")
+      template.gsub!(/\$(\w+)/) { par.fetch(Regexp.last_match(1), "") }
+
+      $stdout.sync = true
+      print "Content-type: text/html; charset=UTF-8\n\n"
+      print template
+    end
+
+    def count_hits(regex, pages)
+      hits = 0
+      pages.each do |file, contents|
+        if regex.match(file) || regex.match(contents)
+          hits += 1
+        end
+      end
+      hits
+    end
+
+    def gen_body(target, regex, pages)
+      body = <<-FORM
  <form action=search.cgi>
   <input
    type="text"
    size="40"
    name="search"
-   value="$target">
+   value="#{target}">
   <input type="submit" value="Search">
  </form>
-EOF
+FORM
 
-opendir(DIR, 'pages') or die "pages: $!";
-my @files = sort grep /^$link$/, readdir(DIR);
-closedir(DIR);
+      pages.each do |file, contents|
+        match = nil
+        if (match_data = regex.match(file))
+          match = match_data[0]
+        elsif (match_data = regex.match(contents))
+          match = match_data[0]
+        end
 
-my ($file, $hits);
-foreach $file ( @files ) {
-	open(SF, "pages/$file") or die "$file: $!";
-	undef $/;
-	my $contents = <SF>;
-	close(SF);
-	if ($file =~ /$pat/i || $contents =~ /$pat/i) {
-		$hits++;
-		$body .= "<a href=wiki.cgi?$file>$file<\/a> . . . . . .  $&<br>\n";
-	}
-}
+        next unless match
 
-my %par;
-$par{summary} = ($hits || "No") . " pages found out of " . scalar @files . " pages searched.";
-$par{title} = "Search Results";
-$par{page} = "WelcomeVisitors";
-$par{body} = $body;
+        body << "<a href=wiki.cgi?#{file}>#{file}</a> . . . . . .  #{match}<br>\n"
+      end
+      body
+    end
+  end
+end
 
-open(T, "template.html") or die "template.html: $!";
-undef $/;
-$_ = <T>;
-close(T);
-s/\$(\w+)/defined($par{$1}) ? $par{$1} : ''/geo;
-print;
-$/ = "\n";
+if $PROGRAM_NAME == __FILE__
+  Quicki::Searcher.new.handle_req
+end

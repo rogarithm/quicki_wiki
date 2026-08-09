@@ -1,71 +1,57 @@
-#! /usr/bin/perl -w
-# Copyright 1994-2000, Cunningham & Cunningham, Inc.
-# Open Source for personal use only.
-# ... and then only
-# with the understanding that the owner(s) cannot be
-# responsible for any behavior of the program or
-# any damages that it may cause. See LICENSE.TXT
+#!/usr/bin/env ruby
 
-# use strict;
-$|++;
-print "Content-type: text/html; charset=UTF-8\n\n";
+module Quicki
+  class Editor
+    LINK = /[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]+)+/
+    MARK = "\uE000"
 
-my $link = "[A-Z][a-z0-9]+([A-Z][a-z0-9]+)+";
-my $mark = "\263";
+    def handle_req
+      page = ENV.fetch("QUERY_STRING", "")[LINK] || "WelcomeVisitors"
+      input = STDIN.read(ENV.fetch("CONTENT_LENGTH", "0").to_i)
+      page_path = File.join("pages", page)
+      source = File.exist?(page_path) ? File.binread(page_path) : nil
 
-my $page = $ENV{QUERY_STRING} =~ /^$link$/
-	? $&
-	: "WelcomeVisitors";
+      mode = input.match?(/append/)
+      text = gen_body(source)
 
-if ($ENV{SERVER_SOFTWARE} =~ /quicki/i) {
- read(NS, $_, $ENV{CONTENT_LENGTH});  # needed for Quicki
- } else {
- read(STDIN, $_, $ENV{CONTENT_LENGTH});  # works in Apache
- }
+      par = {}
+      if mode
+        par["title"] = "Add comment to #{page}"
+        text = ""
+        mode = "append"
+      else
+        par["title"] = "Edit #{page}"
+        mode = "edit"
+      end
 
-my $mode = (/append/) ;
+      par["page"] = page
+      par["body"] = "\t<form method=post action=\"save.cgi?#{page}\">\n" \
+        "\t<textarea name=Text rows=16 cols=60 wrap=virtual>#{text}</textarea>\n" \
+        "\t<p><input type=\"submit\" value=\" Save \">\n" \
+        "      <input type=\"hidden\" name=\"mode\" value=\"#{mode}\">\n" \
+        "\t</form>\n"
 
-my $text = "";
+      template = File.binread("template.html")
+      template.gsub!(/\$(\w+)/) do
+        m = Regexp.last_match(1) # $\w+(템플릿 내의 변수 패턴)에 매칭되는 결과 중 \w+만 저장
+        par.fetch(m, "") # 결과 중 par에 저장된 값이 있으면 템플릿에 값을 채운다
+      end
 
-if ( -e "pages/$page" ) {
-	open(F, "pages/$page") or die "$page: $!";
-	undef $/;
-	$_ = <F>;
-	close(F);
-	if ( /$mark/ ) {
-	 my %bla = split /$mark/, $_ ;
-	 $_ = $bla{text};  # convert hidden-field page to plain
-	 }
-	s/&/&amp;/g;
-	s/</&lt;/g;
-	s/>/&gt;/g;
-	$text = $_;
-	$/ = "\n";
-}
+      $stdout.sync = true
+      print "Content-type: text/html; charset=UTF-8\n\n"
+      print template
+    end
 
+    def gen_body(source)
+      unless source
+        return ''
+      end
 
-my %par;
-if ( $mode ) {
- $par{title} = "Add comment to $page";
- $text = "";
- $mode = "append"
- } else {
- $par{title} = "Edit $page";
- $mode = "edit";
- }
-$par{page} = $page;
-$par{body} = << "";
-	<form method=post action="save.cgi?$page">
-	<textarea name=Text rows=16 cols=60 wrap=virtual>$text</textarea>
-	<p><input type="submit" value=" Save ">
-      <input type="hidden" name="mode" value="$mode">
-	</form>
+      source.gsub("&", "&amp;").gsub("<", "&lt;").gsub(">", "&gt;")
+    end
+  end
+end
 
-open(T, 'template.html') or die "template.html: $!";
-undef $/;
-$_ = <T>;
-close(T);
-s/\$(\w+)/defined($par{$1}) ? $par{$1} : ''/geo;
-print;
-$/ = "\n";
-
+if $PROGRAM_NAME == __FILE__
+  Quicki::Editor.new.handle_req
+end

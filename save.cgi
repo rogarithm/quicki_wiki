@@ -1,86 +1,81 @@
-#! /usr/bin/perl
-# Copyright 1994-2000, Cunningham & Cunningham, Inc.
-# in collaboration with Dave W. Smith
-# Open Source for personal use only.
-# ... and then only
-# with the understanding that the owner(s) cannot be
-# responsible for any behavior of the program or
-# any damages that it may cause. See LICENSE.TXT
+#!/usr/bin/env ruby
 
-# use strict;
-$|++;
-# print "Content-type: text/html\n\n";  # only needed if we use thankyou page
+module Quicki
+  class Writer
+    MARK = "\uE000"
+    LINK = /[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]+)+/
 
-my $mark = "\263";
-my $link = "[A-Z][a-z0-9]+([A-Z][a-z0-9]+)+";
+    def handle_req
+      page = ENV.fetch("QUERY_STRING", "")[/\A#{LINK}\z/]
+      raise "BadSaveName\n" unless page
 
-my $page = $ENV{QUERY_STRING} =~ /^$link$/
-	? $&
-	: die("BadSaveName\n");
+      input = STDIN.read(ENV.fetch("CONTENT_LENGTH", "0").to_i)
+      body = gen_body(input)
 
-if ($ENV{SERVER_SOFTWARE} =~ /quicki/i) {
- read(NS, $_, $ENV{CONTENT_LENGTH});  # needed for Quicki
- } else {
- read(STDIN, $_, $ENV{CONTENT_LENGTH});  # works in Apache
- }
+      text, backlink_target, mode = gen_text(body)
 
-my ($body, %body);
-foreach $_ (split(/&/, $_)) {
-	s/\+/ /g;
-	s/\%(..)/pack('C', hex($1))/geo;
-	($_, $body) = split (/=/, $_, 2);
-	$body{$_} = $body;
-}
+      $stdout.sync = true
+      if backlink_target
+        File.open(File.join("pages", backlink_target), "a") do |file|
+          file.write("\n----\n#{page}")
+        end
+      end
 
-$_ = $body{Text};
-# -v- tab indentation depreciated, do not convert spaces or * to tab+*
-# s/        /\t/g;
-# s/^\*/\t\*/;
-# s/\n\*/\n\t\*/g;
+      File.open(File.join("pages", page), mode) do |file|
+        file.write(text)
+      end
 
-# s/\r\n/\n/g;  # replace DOS crlf with lf
-# s/\r/\n/g;  # replace cr with lf
-/\n/
- ? s/\r//g  # presume PC just strip cr
- : s/\r/\n/g;  # replace cr with lf
+      print "Status: 302 Found\n"
+      print "Location: wiki.cgi?#{page}\n\n"
+    end
 
-s/$mark//g;  # strip markers
+    def gen_body(input)
+      body = {}
+      input.split("&").each do |pair|
+        key, value = pair.split("=", 2)
+        key = key.to_s
+                 .gsub("+", " ") # form 인코딩에서 +로 표현하는 공백을 되돌린다
+                 .gsub(/%(..)/) do
+          m = Regexp.last_match(1)
+          [m.hex].pack("C") # %HH 형태의 percent-encoding을 바이트로 되돌린다
+        end
+        value = value.to_s
+                     .gsub("+", " ") # form 인코딩에서 +로 표현하는 공백을 되돌린다
+                     .gsub(/%(..)/) do
+          m = Regexp.last_match(1)
+          [m.hex].pack("C") # %HH 형태의 percent-encoding을 바이트로 되돌린다
+        end
+        body[key] = value
+      end
+      body
+    end
 
-# -v- autobacklink
-if ( s/<<($link)\b/$1/g ) {
- open(P, ">>pages/$1") or die "$1: $!";
- print P "\n----\n$page";
- close(P);
- }
+    def gen_text(body)
+      text = body.fetch("Text", "")
+      text = if text.include?("\n")
+               text.delete("\r")
+             else
+               text.tr("\r", "\n")
+             end
 
-my $mode = ">pages/$page";
-if ($body{mode} =~ /append/) {
- $mode = ">" . $mode;
- $_ = "\n----\n\n$_";
- }
-open(F, $mode) or die "$page: $!";
-print F;
-close(F);
+      # <<WikiWord 형식이 있으면 WikiWord 페이지에 현재 페이지 백링크를 추가한다
+      backlink_target = nil
+      text = text.gsub(/<<(#{LINK})\b/) do
+        backlink_target = Regexp.last_match(1) # <<를 제외한 LINK 형식 문자열
+        backlink_target
+      end
 
-#my $RcsBin = "I:/WWW/LEUF_net/cgi-bin/bin"; # no / here
-#my $path = "I:/WWW/LEUF_net/wiki5/pages" ;
-#`$RcsBin/ci -l $path/$page 2>&1` ;
+      mode = "w"
+      if body.fetch("mode", "") =~ /append/
+        mode = "a"
+        text = "\n----\n\n#{text}"
+      end
 
-do "wiki.cgi" ;
+      [text, backlink_target, mode]
+    end
+  end
+end
 
-#my %par;
-#$par{title} = "Thank You";
-#$par{page} = $page;
-#$par{body} = << "";
-#	The <a href=wiki.cgi?$page>$page</a> page has been saved.
-#	You may <b>back</b> up to the edit form and make further changes.
-#	Remember to <b>reload</b> old copies of this page and especially
-#	old copies of the editor.</i>
-#
-#open(T, 'template.html') or die "template.html: $!";
-#undef $/;
-#$_ = <T>;
-#close(T);
-#s/\$(\w+)/defined($par{$1}) ? $par{$1} : ''/geo;
-#print;
-#$/ = "\n";
+if $PROGRAM_NAME == __FILE__
+  Quicki::Writer.new.handle_req
+end

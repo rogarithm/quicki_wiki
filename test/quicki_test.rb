@@ -65,7 +65,7 @@ class QuickiCoreTest < Minitest::Test
     assert_equal("logo.gif", find_cgi("/logo.gif"))
   end
 
-  # 허용 목록에 없는 CGI 이름이거나 매핑된 .rb.cgi 파일이 실제로 없으면 not_found를 반환한다
+  # 허용 목록에 없는 CGI 이름이거나 매핑된 .cgi 파일이 실제로 없으면 not_found를 반환한다
   def test_run_cgi_returns_not_found_for_unknown_or_missing_script
     assert_match("404 Not Found", run_cgi("unknown.cgi", method: "GET", req_uri: "/", headers: {}, body: ""))
 

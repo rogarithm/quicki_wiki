@@ -47,7 +47,7 @@ end
 
 def run_cgi(script_name, request)
   cgi = CGI_NAMES.find {|name| name == script_name.split('.')[0]}
-  cgi_path = cgi.nil? ? "" : "#{cgi}.rb.cgi"
+  cgi_path = cgi.nil? ? "" : "#{cgi}.cgi"
 
   return not_found if cgi_path.empty? || !File.file?(cgi_path)
 
