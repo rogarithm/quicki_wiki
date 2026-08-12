@@ -53,7 +53,8 @@ module Quicki
         has_matching = false
         line.sub!(/^\t+/, "")
 
-        line, has_matching, rule_n_match = sub2html(line, has_matching)
+        line, has_matching, rule, match = sub2html(line, has_matching)
+        rule_n_match = match.nil? ? nil : [rule, match].flatten
 
         body << wrap_block_tags(codes, rule_n_match)
 
@@ -122,18 +123,18 @@ module Quicki
     )
 
     def sub2html(line, has_matching)
-      rule_n_match = BLOCK_RULES.filter_map {|r|
+      rule, match = BLOCK_RULES.filter_map {|r|
         pat = r[0]
         mat = pat.match(line)
-        mat ? [r, mat].flatten! : nil
+        mat ? [r, mat] : nil
       }.first
 
-      if rule_n_match
+      if rule
         has_matching = true
-        pat, re, _tag, _depth_rule, _mat = rule_n_match
+        pat, re, _tag, _depth_rule = rule
         line = line.sub(pat) { re.call(Regexp.last_match) }
       end
-      [line, has_matching, rule_n_match]
+      [line, has_matching, rule, match]
     end
 
     def wrap_block_tags(codes, rule_n_match)

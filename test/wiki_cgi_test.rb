@@ -76,7 +76,7 @@ class WikiBrowserTest < Minitest::Test
 
   # 들여쓴 줄은 PRE 후보로 감지하되 본문 내용은 바꾸지 않는다
   def test_sub2html_detects_indented_lines_for_pre
-    line, has_matching, _rule = @browser.sub2html(" indented", false)
+    line, has_matching, _rule, _match = @browser.sub2html(" indented", false)
 
     assert_equal(" indented", line)
     assert_equal(true, has_matching)
@@ -136,28 +136,40 @@ class WikiBrowserTest < Minitest::Test
       "<PRE>",
       @browser.wrap_block_tags(
         [],
-        @browser.sub2html(" indented", false)[2]
+        [
+          @browser.sub2html(" indented", false)[2],
+          @browser.sub2html(" indented", false)[3]
+        ].flatten
       )
     )
     assert_equal(
       "<UL>",
       @browser.wrap_block_tags(
         [],
-        @browser.sub2html("* item", false)[2]
+        [
+          @browser.sub2html("* item", false)[2],
+          @browser.sub2html("* item", false)[3]
+        ].flatten
       )
     )
     assert_equal(
       "<OL>",
       @browser.wrap_block_tags(
         [],
-        @browser.sub2html("# item", false)[2]
+        [
+          @browser.sub2html("# item", false)[2],
+          @browser.sub2html("# item", false)[3]
+        ].flatten
       )
     )
     assert_equal(
       "<DL>",
       @browser.wrap_block_tags(
         [],
-        @browser.sub2html(":term: value", false)[2]
+        [
+          @browser.sub2html(":term: value", false)[2],
+          @browser.sub2html(":term: value", false)[3]
+        ].flatten
       )
     )
     assert_equal(
@@ -171,14 +183,20 @@ class WikiBrowserTest < Minitest::Test
       "<H2>",
       @browser.wrap_block_tags(
         [],
-        @browser.sub2html("!!head", false)[2]
+        [
+          @browser.sub2html("!!head", false)[2],
+          @browser.sub2html("!!head", false)[3]
+        ].flatten
       )
     )
     assert_equal(
       "<BLOCKQUOTE>",
       @browser.wrap_block_tags(
         [],
-        @browser.sub2html('""quote', false)[2]
+        [
+          @browser.sub2html('""quote', false)[2],
+          @browser.sub2html('""quote', false)[3]
+        ].flatten
       )
     )
   end
