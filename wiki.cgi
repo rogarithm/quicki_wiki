@@ -97,25 +97,32 @@ module Quicki
       [in_place_urls, line]
     end
 
-    def sub2html(line, has_matching)
-      rules = [
-        # pattern, replace
-        [/^\s*$/, ->(_) { "<p>" }],
-        # match만 하고 치환은 하지 않는다.
-        # emit_code 연산 시 이 rules에 포함된 패턴만 체크하기 때문에,
-        # emit_code용 rule을 현재 rule이 모두 포함해야 한다
-        [/^\s/, ->(m) { m }],
-        [/^(\*+)/, ->(_) { "<li>" }],
-        [/^(\#+)/, ->(_) { "<li>" }],
-        [/^(:+)(.+?):( +)/, ->(m) { "<dt>#{m[2]}<dd>" }],
-        [/^(\d+)\./, ->(_) { "<li>" }],
-        [/^!!!!/, ->(_) { "" }],
-        [/^!!!/, ->(_) { "" }],
-        [/^!!/, ->(_) { "" }],
-        [/^\"\"/, ->(_) { "" }],
+    # 패턴 (예: /^(\*+)/)
+    # 그 줄 자체를 어떻게 치환할지 (예: <li>)
+    # 이 매칭이 여는 블록 태그 이름 (예: UL, 헤더류는 H2 등, 빈 줄은 없음)
+    # 그 블록의 깊이를 매치 결과로부터 계산하는 방법
+    BLOCK_RULES = [
+      # pattern,   replace_rule,     block_tag,    depth_rule
+      [/^\s*$/,    ->(_) { "<p>" }],
+      [/^\s/,      ->(m) { m },      "PRE",        ->(_) { 1 }],
+      [/^(\*+)/,   ->(_) { "<li>" }, "UL",         ->(mat) {mat[1].length}],
+      [/^(\#+)/,   ->(_) { "<li>" }, "OL",         ->(mat) {mat[1].length}],
+      [/^(\d+)\./, ->(_) { "<li>" }, "OL",         ->(_) { 1 }],
+      [/^!!!!/,    ->(_) { "" },     "H4",         ->(_) { 1 }],
+      [/^!!!/,     ->(_) { "" },     "H3",         ->(_) { 1 }],
+      [/^!!/,      ->(_) { "" },     "H2",         ->(_) { 1 }],
+      [/^\"\"/,    ->(_) { "" },     "BLOCKQUOTE", ->(_) { 1 }],
+    ].concat(
+      [
+        [/^(:+)(.+?):( +)/,
+        ->(m) { "<dt>#{m[2]}<dd>" },
+        "DL",
+        ->(mat) {mat[1].length}]
       ]
+    )
 
-      rule_n_match = rules.filter_map {|r|
+    def sub2html(line, has_matching)
+      rule_n_match = BLOCK_RULES.filter_map {|r|
         pat = r[0]
         mat = pat.match(line)
         mat ? [r, mat].flatten! : nil
@@ -123,33 +130,17 @@ module Quicki
 
       if rule_n_match
         has_matching = true
-        pat, re, _ = rule_n_match
+        pat, re, _tag, _depth_rule, _mat = rule_n_match
         line = line.sub(pat) { re.call(Regexp.last_match) }
       end
       [line, has_matching, rule_n_match]
     end
 
     def wrap_block_tags(codes, rule_n_match)
-      rules = [
-        # pattern, code, depth
-        [/^\s/, "PRE", ->(_) { 1 }],
-        [/^(\*+)/, "UL", ->(mat) {mat[1].length}],
-        [/^(\#+)/, "OL", ->(mat) {mat[1].length}],
-        [/^(:+)(.+?):( +)/, "DL", ->(mat) {mat[1].length}],
-        [/^(\d+)\./, "OL", ->(_) { 1 }],
-        [/^!!!!/, "H4", ->(_) { 1 }],
-        [/^!!!/, "H3", ->(_) { 1 }],
-        [/^!!/, "H2", ->(_) { 1 }],
-        [/^\"\"/, "BLOCKQUOTE", ->(_) { 1 }],
-      ]
       return "" unless rule_n_match
 
-      pat, _, mat = rule_n_match
-      r = rules.find {|r| r[0] == pat}
-      return "" unless r
-
-      _, code, depth = r
-      emit_code(codes, code, depth.call(mat))
+      _pat, _re, tag, depth_rule, mat = rule_n_match
+      emit_code(codes, tag, depth_rule.call(mat))
     end
 
     def emit_code(codes, code, depth)
