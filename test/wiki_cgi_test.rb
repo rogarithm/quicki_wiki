@@ -136,74 +136,63 @@ class WikiBrowserTest < Minitest::Test
       "<PRE>",
       @browser.wrap_block_tags(
         [],
-        [
-          @browser.sub2html(" indented", false)[2],
-          @browser.sub2html(" indented", false)[3]
-        ].flatten
+        @browser.sub2html(" indented", false)[2],
+        @browser.sub2html(" indented", false)[3]
       )
     )
     assert_equal(
       "<UL>",
       @browser.wrap_block_tags(
         [],
-        [
-          @browser.sub2html("* item", false)[2],
-          @browser.sub2html("* item", false)[3]
-        ].flatten
+        @browser.sub2html("* item", false)[2],
+        @browser.sub2html("* item", false)[3]
       )
     )
     assert_equal(
       "<OL>",
       @browser.wrap_block_tags(
         [],
-        [
-          @browser.sub2html("# item", false)[2],
-          @browser.sub2html("# item", false)[3]
-        ].flatten
+        @browser.sub2html("# item", false)[2],
+        @browser.sub2html("# item", false)[3]
       )
     )
     assert_equal(
       "<DL>",
       @browser.wrap_block_tags(
         [],
-        [
-          @browser.sub2html(":term: value", false)[2],
-          @browser.sub2html(":term: value", false)[3]
-        ].flatten
+        @browser.sub2html(":term: value", false)[2],
+        @browser.sub2html(":term: value", false)[3]
       )
     )
     assert_equal(
       "<OL>",
       @browser.wrap_block_tags(
         [],
-        @browser.sub2html("1. item", false)[2]
+        @browser.sub2html("1. item", false)[2],
+        @browser.sub2html("1. item", false)[3]
       )
     )
     assert_equal(
       "<H2>",
       @browser.wrap_block_tags(
         [],
-        [
-          @browser.sub2html("!!head", false)[2],
-          @browser.sub2html("!!head", false)[3]
-        ].flatten
+        @browser.sub2html("!!head", false)[2],
+        @browser.sub2html("!!head", false)[3]
       )
     )
     assert_equal(
       "<BLOCKQUOTE>",
       @browser.wrap_block_tags(
         [],
-        [
-          @browser.sub2html('""quote', false)[2],
-          @browser.sub2html('""quote', false)[3]
-        ].flatten
+        @browser.sub2html('""quote', false)[2],
+        @browser.sub2html('""quote', false)[3]
       )
     )
   end
 
   # 블록 규칙이 아니면 빈 문자열을 반환한다
   def test_wrap_block_tags_returns_empty_string_for_non_block_rule
-    assert_equal("", @browser.wrap_block_tags([], nil))
+    assert_equal("", @browser.wrap_block_tags([], nil, nil))
   end
 
   # 현재 depth보다 깊어져야 하면 필요한 만큼 여는 태그를 추가한다

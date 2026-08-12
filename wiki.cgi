@@ -54,9 +54,8 @@ module Quicki
         line.sub!(/^\t+/, "")
 
         line, has_matching, rule, match = sub2html(line, has_matching)
-        rule_n_match = match.nil? ? nil : [rule, match].flatten
 
-        body << wrap_block_tags(codes, rule_n_match)
+        body << wrap_block_tags(codes, rule, match)
 
         # 블록 규칙에 매칭되지 않는 경우, 열린 블록을 모두 닫는다
         body << emit_code(codes, "", 0) unless has_matching
@@ -137,11 +136,11 @@ module Quicki
       [line, has_matching, rule, match]
     end
 
-    def wrap_block_tags(codes, rule_n_match)
-      return "" unless rule_n_match
+    def wrap_block_tags(codes, rule, match)
+      return "" unless rule
 
-      _pat, _re, tag, depth_rule, mat = rule_n_match
-      emit_code(codes, tag, depth_rule.call(mat))
+      _pat, _re, tag, depth_rule = rule
+      emit_code(codes, tag, depth_rule.call(match))
     end
 
     def emit_code(codes, code, depth)
