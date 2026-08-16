@@ -42,7 +42,7 @@ module Quicki
     end
 
     def render_wiki_doc(source)
-      codes = []
+      bt = BlockTagger.new
       in_place_urls = []
       body = +""
       escaped = source.gsub("&", "&amp;").gsub("<", "&lt;").gsub(">", "&gt;")
@@ -53,12 +53,12 @@ module Quicki
         has_matching = false
         line.sub!(/^\t+/, "")
 
-        line, has_matching, rule_n_match = sub2html(line, has_matching)
+        line, has_matching, rule, match = sub2html(line, has_matching)
 
-        body << wrap_block_tags(codes, rule_n_match)
+        body << wrap_block_tags(bt, rule, match)
 
         # 블록 규칙에 매칭되지 않는 경우, 열린 블록을 모두 닫는다
-        body << emit_code(codes, "", 0) unless has_matching
+        body << bt.close_all unless has_matching
 
         line.sub!(/^-----*/, "<hr>")
         line.gsub!(/'''(.*?)'''/, '<strong>\1</strong>')
@@ -71,106 +71,78 @@ module Quicki
         body << line << "\n"
       end
 
-      body << emit_code(codes, "", 0)
+      body << bt.close_all
       body
     end
 
     def extract_in_place_urls(in_place_urls, line)
       index = 0
 
-      while line.sub!(/\b(javascript):\S.*/, "#{MARK}#{index}#{MARK}")
-        in_place_urls[index] = Regexp.last_match(0)
+      inline_js_url = /\b(javascript):\S.*/
+      line = line.gsub(inline_js_url) do |match| # match에 매칭된 값이 들어간다
+        current_idx = index
         index += 1
+        in_place_urls[current_idx] = match
+        "#{MARK}#{current_idx}#{MARK}" # 이 값으로 치환한다
       end
 
-      while line.sub!(/\b#{PROTOCOL.source}:[^\s<>\[\]"'()]*[^\s<>\[\]"'(),.?]/, "#{MARK}#{index}#{MARK}")
-        in_place_urls[index] = Regexp.last_match(0)
+      plain_url = /\b#{PROTOCOL.source}:[^\s<>\[\]"'()]*[^\s<>\[\]"'(),.?]/
+      line = line.gsub(plain_url) do |match|
+        current_idx = index
         index += 1
+        in_place_urls[current_idx] = match
+        "#{MARK}#{current_idx}#{MARK}"
       end
 
       [in_place_urls, line]
     end
 
-    def sub2html(line, has_matching)
-      rules = [
-        # pattern, replace
-        [/^\s*$/, "<p>"],
-        # match만 하고 치환은 하지 않는다.
-        # emit_code 연산 시 이 rules에 포함된 패턴만 체크하기 때문에,
-        # emit_code용 rule을 현재 rule이 모두 포함해야 한다
-        [/^\s/, nil],
-        [/^(\*+)/, "<li>"],
-        [/^(\#+)/, "<li>"],
-        [/^(:+)(.+?):( +)/, ->(m) { "<dt>#{m[2]}<dd>" }],
-        [/^(\d+)\./, "<li>"],
-        [/^!!!!/, ""],
-        [/^!!!/, ""],
-        [/^!!/, ""],
-        [/^\"\"/, ""],
+    # 패턴 (예: /^(\*+)/)
+    # 그 줄 자체를 어떻게 치환할지 (예: <li>)
+    # 이 매칭이 여는 블록 태그 이름 (예: UL, 헤더류는 H2 등, 빈 줄은 없음)
+    # 그 블록의 깊이를 매치 결과로부터 계산하는 방법
+    BlockRule = Struct.new(:pattern, :replace_rule, :block_tag, :depth_rule)
+    BLOCK_RULES = [
+                    # pattern,   replace_rule,     block_tag,    depth_rule
+      BlockRule.new(/^\s*$/,    ->(_) { "<p>" },  nil,          nil),
+      BlockRule.new(/^\s/,      ->(m) { m },      "PRE",        ->(_) { 1 }),
+      BlockRule.new(/^(\*+)/,   ->(_) { "<li>" }, "UL",         ->(mat) {mat[1].length}),
+      BlockRule.new(/^(\#+)/,   ->(_) { "<li>" }, "OL",         ->(mat) {mat[1].length}),
+      BlockRule.new(/^(\d+)\./, ->(_) { "<li>" }, "OL",         ->(_) { 1 }),
+      BlockRule.new(/^!!!!/,    ->(_) { "" },     "H4",         ->(_) { 1 }),
+      BlockRule.new(/^!!!/,     ->(_) { "" },     "H3",         ->(_) { 1 }),
+      BlockRule.new(/^!!/,      ->(_) { "" },     "H2",         ->(_) { 1 }),
+      BlockRule.new(/^\"\"/,    ->(_) { "" },     "BLOCKQUOTE", ->(_) { 1 }),
+    ].concat(
+      [
+        BlockRule.new(
+          /^(:+)(.+?):( +)/,
+          ->(m) { "<dt>#{m[2]}<dd>" },
+          "DL",
+          ->(mat) {mat[1].length}
+        )
       ]
+    )
 
-      rule_n_match = rules.filter_map {|r|
-        pat = r[0]
-        mat = pat.match(line)
-        mat ? [r, mat].flatten! : nil
+    def sub2html(line, has_matching)
+      rule, match = BLOCK_RULES.filter_map {|r|
+        mat = r.pattern.match(line)
+        mat ? [r, mat] : nil
       }.first
 
-      if rule_n_match
+      if rule
         has_matching = true
-        pat, re, _ = rule_n_match
-        line = if re.nil? # 치환하면 안되는 경우는 여기서 처리한다
-                 line
-               elsif re.respond_to?(:call)
-                 line.sub(pat) { re.call(Regexp.last_match) }
-               else
-                 line.sub(pat, re)
-               end
+        line = line.sub(rule.pattern) { rule.replace_rule.call(Regexp.last_match) }
       end
-      [line, has_matching, rule_n_match]
+      [line, has_matching, rule, match]
     end
 
-    def wrap_block_tags(codes, rule_n_match)
-      rules = [
-        # pattern, code, depth
-        [/^\s/, "PRE", 1],
-        [/^(\*+)/, "UL", ->(mat) {mat[1].length}],
-        [/^(\#+)/, "OL", ->(mat) {mat[1].length}],
-        [/^(:+)(.+?):( +)/, "DL", ->(mat) {mat[1].length}],
-        [/^(\d+)\./, "OL", 1],
-        [/^!!!!/, "H4", 1],
-        [/^!!!/, "H3", 1],
-        [/^!!/, "H2", 1],
-        [/^\"\"/, "BLOCKQUOTE", 1],
-      ]
-      return "" unless rule_n_match
+    def wrap_block_tags(block_tagger, rule, match)
+      return "" unless rule
 
-      pat, _, mat = rule_n_match
-      r = rules.find {|r| r[0] == pat}
-      return "" unless r
+      return "" unless rule.block_tag
 
-      _, code, depth = r
-      if depth.respond_to?(:call)
-        emit_code(codes, code, depth.call(mat))
-      else
-        emit_code(codes, code, depth)
-      end
-    end
-
-    def emit_code(codes, code, depth)
-      tags = +""
-      while codes.length > depth
-        tags << "</#{codes[-1]}>\n<p>"
-        codes.pop
-      end
-      while codes.length < depth
-        tags << "<#{code}>"
-        codes << code
-      end
-      if codes[-1].to_s != code
-        tags << "</#{codes[-1]}>\n<#{code}>"
-        codes[-1] = code
-      end
-      tags
+      block_tagger.transition_to(rule.block_tag, rule.depth_rule.call(match))
     end
 
     def as_anchor(title)
@@ -188,6 +160,38 @@ module Quicki
       else
         "<a href=\"#{in_place_urls[index]}\">#{ref}</a>"
       end
+    end
+  end
+
+  class BlockTagger
+    attr_reader :open_tags
+
+    def initialize(open_tags = [])
+      @open_tags = open_tags
+    end
+
+    def transition_to(tag, depth)
+      tags = +""
+      # 두 while은 상호 배타적으로 실행된다 (최종적으로 length == depth에 수렴)
+      while @open_tags.length > depth
+        tags << "</#{@open_tags[-1]}>\n<p>"
+        @open_tags.pop
+      end
+      while @open_tags.length < depth
+        tags << "<#{tag}>"
+        @open_tags << tag
+      end
+      # open_tags가 완전히 비면 open_tags[-1]은 nil이며, nil.to_s == "" 이므로
+      # tag="" 일 때 이 분기는 실행되지 않는다
+      if @open_tags[-1].to_s != tag
+        tags << "</#{@open_tags[-1]}>\n<#{tag}>"
+        @open_tags[-1] = tag
+      end
+      tags
+    end
+
+    def close_all
+      transition_to("", 0)
     end
   end
 end
