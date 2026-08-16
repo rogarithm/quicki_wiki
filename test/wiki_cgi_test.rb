@@ -135,7 +135,7 @@ class WikiBrowserTest < Minitest::Test
     assert_equal(
       "",
       @browser.wrap_block_tags(
-        [],
+        Quicki::BlockTagger.new,
         @browser.sub2html("* item one\n\n* item two", false)[2],
         @browser.sub2html("* item one\n\n* item two", false)[3]
       )
@@ -144,7 +144,7 @@ class WikiBrowserTest < Minitest::Test
     assert_equal(
       "<PRE>",
       @browser.wrap_block_tags(
-        [],
+        Quicki::BlockTagger.new,
         @browser.sub2html(" indented", false)[2],
         @browser.sub2html(" indented", false)[3]
       )
@@ -152,7 +152,7 @@ class WikiBrowserTest < Minitest::Test
     assert_equal(
       "<UL>",
       @browser.wrap_block_tags(
-        [],
+        Quicki::BlockTagger.new,
         @browser.sub2html("* item", false)[2],
         @browser.sub2html("* item", false)[3]
       )
@@ -160,7 +160,7 @@ class WikiBrowserTest < Minitest::Test
     assert_equal(
       "<OL>",
       @browser.wrap_block_tags(
-        [],
+        Quicki::BlockTagger.new,
         @browser.sub2html("# item", false)[2],
         @browser.sub2html("# item", false)[3]
       )
@@ -168,7 +168,7 @@ class WikiBrowserTest < Minitest::Test
     assert_equal(
       "<DL>",
       @browser.wrap_block_tags(
-        [],
+        Quicki::BlockTagger.new,
         @browser.sub2html(":term: value", false)[2],
         @browser.sub2html(":term: value", false)[3]
       )
@@ -176,7 +176,7 @@ class WikiBrowserTest < Minitest::Test
     assert_equal(
       "<OL>",
       @browser.wrap_block_tags(
-        [],
+        Quicki::BlockTagger.new,
         @browser.sub2html("1. item", false)[2],
         @browser.sub2html("1. item", false)[3]
       )
@@ -184,7 +184,7 @@ class WikiBrowserTest < Minitest::Test
     assert_equal(
       "<H2>",
       @browser.wrap_block_tags(
-        [],
+        Quicki::BlockTagger.new,
         @browser.sub2html("!!head", false)[2],
         @browser.sub2html("!!head", false)[3]
       )
@@ -192,7 +192,7 @@ class WikiBrowserTest < Minitest::Test
     assert_equal(
       "<BLOCKQUOTE>",
       @browser.wrap_block_tags(
-        [],
+        Quicki::BlockTagger.new,
         @browser.sub2html('""quote', false)[2],
         @browser.sub2html('""quote', false)[3]
       )
@@ -201,36 +201,38 @@ class WikiBrowserTest < Minitest::Test
 
   # 블록 규칙이 아니면 빈 문자열을 반환한다
   def test_wrap_block_tags_returns_empty_string_for_non_block_rule
-    assert_equal("", @browser.wrap_block_tags([], nil, nil))
+    assert_equal("", @browser.wrap_block_tags(Quicki::BlockTagger.new, nil, nil))
   end
 
   # 현재 depth보다 깊어져야 하면 필요한 만큼 여는 태그를 추가한다
   def test_emit_code_opens_tags_until_depth_is_reached
-    codes = []
+    bt = Quicki::BlockTagger.new
 
-    assert_equal("<UL><UL>", @browser.emit_code(codes, "UL", 2))
-    assert_equal(["UL", "UL"], codes)
+    assert_equal("<UL><UL>", bt.transition_to("UL", 2))
+    assert_equal(["UL", "UL"], bt.open_tags)
   end
 
   # 현재 depth보다 얕아지면 초과된 태그를 닫고 p 구분자를 추가한다
   def test_emit_code_closes_tags_when_depth_decreases
-    codes = ["UL", "UL"]
+    bt = Quicki::BlockTagger.new(["UL", "UL"])
 
-    assert_equal("</UL>\n<p>", @browser.emit_code(codes, "UL", 1))
-    assert_equal(["UL"], codes)
+    assert_equal("</UL>\n<p>", bt.transition_to("UL", 1))
+    assert_equal(["UL"], bt.open_tags)
   end
 
   # depth는 같고 태그 종류만 바뀌면 기존 태그를 닫고 새 태그를 연다
   def test_emit_code_switches_tag_when_tag_type_changes
-    codes = ["UL"]
+    bt = Quicki::BlockTagger.new(["UL"])
 
-    assert_equal("</UL>\n<OL>", @browser.emit_code(codes, "OL", 1))
-    assert_equal(["OL"], codes)
+    assert_equal("</UL>\n<OL>", bt.transition_to("OL", 1))
+    assert_equal(["OL"], bt.open_tags)
   end
 
   # 현재 스택과 요청된 태그/깊이가 같으면 빈 문자열을 반환한다
   def test_emit_code_returns_empty_string_when_stack_already_matches
-    assert_equal("", @browser.emit_code(["UL"], "UL", 1))
+    bt = Quicki::BlockTagger.new(["UL"])
+
+    assert_equal("", bt.transition_to("UL", 1))
   end
 
   # 긴 javascript URL은 표시 텍스트만 축약하고 href에는 원본 값을 유지한다

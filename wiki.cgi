@@ -42,7 +42,7 @@ module Quicki
     end
 
     def render_wiki_doc(source)
-      codes = []
+      bt = BlockTagger.new
       in_place_urls = []
       body = +""
       escaped = source.gsub("&", "&amp;").gsub("<", "&lt;").gsub(">", "&gt;")
@@ -55,10 +55,10 @@ module Quicki
 
         line, has_matching, rule, match = sub2html(line, has_matching)
 
-        body << wrap_block_tags(codes, rule, match)
+        body << wrap_block_tags(bt, rule, match)
 
         # 블록 규칙에 매칭되지 않는 경우, 열린 블록을 모두 닫는다
-        body << emit_code(codes, "", 0) unless has_matching
+        body << bt.close_all unless has_matching
 
         line.sub!(/^-----*/, "<hr>")
         line.gsub!(/'''(.*?)'''/, '<strong>\1</strong>')
@@ -71,7 +71,7 @@ module Quicki
         body << line << "\n"
       end
 
-      body << emit_code(codes, "", 0)
+      body << bt.close_all
       body
     end
 
@@ -136,29 +136,13 @@ module Quicki
       [line, has_matching, rule, match]
     end
 
-    def wrap_block_tags(codes, rule, match)
+    def wrap_block_tags(block_tagger, rule, match)
       return "" unless rule
 
       _pat, _re, tag, depth_rule = rule
       return "" unless tag
-      emit_code(codes, tag, depth_rule.call(match))
-    end
 
-    def emit_code(codes, code, depth)
-      tags = +""
-      while codes.length > depth
-        tags << "</#{codes[-1]}>\n<p>"
-        codes.pop
-      end
-      while codes.length < depth
-        tags << "<#{code}>"
-        codes << code
-      end
-      if codes[-1].to_s != code
-        tags << "</#{codes[-1]}>\n<#{code}>"
-        codes[-1] = code
-      end
-      tags
+      block_tagger.transition_to(tag, depth_rule.call(match))
     end
 
     def as_anchor(title)
@@ -176,6 +160,38 @@ module Quicki
       else
         "<a href=\"#{in_place_urls[index]}\">#{ref}</a>"
       end
+    end
+  end
+
+  class BlockTagger
+    attr_reader :open_tags
+
+    def initialize(open_tags = [])
+      @open_tags = open_tags
+    end
+
+    def transition_to(tag, depth)
+      tags = +""
+      # 두 while은 상호 배타적으로 실행된다 (최종적으로 length == depth에 수렴)
+      while @open_tags.length > depth
+        tags << "</#{@open_tags[-1]}>\n<p>"
+        @open_tags.pop
+      end
+      while @open_tags.length < depth
+        tags << "<#{tag}>"
+        @open_tags << tag
+      end
+      # open_tags가 완전히 비면 open_tags[-1]은 nil이며, nil.to_s == "" 이므로
+      # tag="" 일 때 이 분기는 실행되지 않는다
+      if @open_tags[-1].to_s != tag
+        tags << "</#{@open_tags[-1]}>\n<#{tag}>"
+        @open_tags[-1] = tag
+      end
+      tags
+    end
+
+    def close_all
+      transition_to("", 0)
     end
   end
 end
