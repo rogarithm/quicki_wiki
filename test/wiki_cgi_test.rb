@@ -133,6 +133,15 @@ class WikiBrowserTest < Minitest::Test
   # PRE 규칙, 별표 목록 규칙, 샵 목록 규칙, 정의 목록 규칙, 숫자 목록 규칙, 제목 및 blockquote 규칙을 적절히 처리한다
   def test_wrap_block_tags_emits_expected_tags_for_supported_rules
     assert_equal(
+      "",
+      @browser.wrap_block_tags(
+        [],
+        @browser.sub2html("* item one\n\n* item two", false)[2],
+        @browser.sub2html("* item one\n\n* item two", false)[3]
+      )
+    )
+
+    assert_equal(
       "<PRE>",
       @browser.wrap_block_tags(
         [],

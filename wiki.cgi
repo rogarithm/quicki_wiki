@@ -103,7 +103,7 @@ module Quicki
     # 그 블록의 깊이를 매치 결과로부터 계산하는 방법
     BLOCK_RULES = [
       # pattern,   replace_rule,     block_tag,    depth_rule
-      [/^\s*$/,    ->(_) { "<p>" }],
+      [/^\s*$/,    ->(_) { "<p>" },  nil,          nil],
       [/^\s/,      ->(m) { m },      "PRE",        ->(_) { 1 }],
       [/^(\*+)/,   ->(_) { "<li>" }, "UL",         ->(mat) {mat[1].length}],
       [/^(\#+)/,   ->(_) { "<li>" }, "OL",         ->(mat) {mat[1].length}],
@@ -140,6 +140,7 @@ module Quicki
       return "" unless rule
 
       _pat, _re, tag, depth_rule = rule
+      return "" unless tag
       emit_code(codes, tag, depth_rule.call(match))
     end
 
