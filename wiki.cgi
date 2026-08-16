@@ -101,37 +101,38 @@ module Quicki
     # 그 줄 자체를 어떻게 치환할지 (예: <li>)
     # 이 매칭이 여는 블록 태그 이름 (예: UL, 헤더류는 H2 등, 빈 줄은 없음)
     # 그 블록의 깊이를 매치 결과로부터 계산하는 방법
+    BlockRule = Struct.new(:pattern, :replace_rule, :block_tag, :depth_rule)
     BLOCK_RULES = [
-      # pattern,   replace_rule,     block_tag,    depth_rule
-      [/^\s*$/,    ->(_) { "<p>" },  nil,          nil],
-      [/^\s/,      ->(m) { m },      "PRE",        ->(_) { 1 }],
-      [/^(\*+)/,   ->(_) { "<li>" }, "UL",         ->(mat) {mat[1].length}],
-      [/^(\#+)/,   ->(_) { "<li>" }, "OL",         ->(mat) {mat[1].length}],
-      [/^(\d+)\./, ->(_) { "<li>" }, "OL",         ->(_) { 1 }],
-      [/^!!!!/,    ->(_) { "" },     "H4",         ->(_) { 1 }],
-      [/^!!!/,     ->(_) { "" },     "H3",         ->(_) { 1 }],
-      [/^!!/,      ->(_) { "" },     "H2",         ->(_) { 1 }],
-      [/^\"\"/,    ->(_) { "" },     "BLOCKQUOTE", ->(_) { 1 }],
+                    # pattern,   replace_rule,     block_tag,    depth_rule
+      BlockRule.new(/^\s*$/,    ->(_) { "<p>" },  nil,          nil),
+      BlockRule.new(/^\s/,      ->(m) { m },      "PRE",        ->(_) { 1 }),
+      BlockRule.new(/^(\*+)/,   ->(_) { "<li>" }, "UL",         ->(mat) {mat[1].length}),
+      BlockRule.new(/^(\#+)/,   ->(_) { "<li>" }, "OL",         ->(mat) {mat[1].length}),
+      BlockRule.new(/^(\d+)\./, ->(_) { "<li>" }, "OL",         ->(_) { 1 }),
+      BlockRule.new(/^!!!!/,    ->(_) { "" },     "H4",         ->(_) { 1 }),
+      BlockRule.new(/^!!!/,     ->(_) { "" },     "H3",         ->(_) { 1 }),
+      BlockRule.new(/^!!/,      ->(_) { "" },     "H2",         ->(_) { 1 }),
+      BlockRule.new(/^\"\"/,    ->(_) { "" },     "BLOCKQUOTE", ->(_) { 1 }),
     ].concat(
       [
-        [/^(:+)(.+?):( +)/,
-        ->(m) { "<dt>#{m[2]}<dd>" },
-        "DL",
-        ->(mat) {mat[1].length}]
+        BlockRule.new(
+          /^(:+)(.+?):( +)/,
+          ->(m) { "<dt>#{m[2]}<dd>" },
+          "DL",
+          ->(mat) {mat[1].length}
+        )
       ]
     )
 
     def sub2html(line, has_matching)
       rule, match = BLOCK_RULES.filter_map {|r|
-        pat = r[0]
-        mat = pat.match(line)
+        mat = r.pattern.match(line)
         mat ? [r, mat] : nil
       }.first
 
       if rule
         has_matching = true
-        pat, re, _tag, _depth_rule = rule
-        line = line.sub(pat) { re.call(Regexp.last_match) }
+        line = line.sub(rule.pattern) { rule.replace_rule.call(Regexp.last_match) }
       end
       [line, has_matching, rule, match]
     end
@@ -139,10 +140,9 @@ module Quicki
     def wrap_block_tags(block_tagger, rule, match)
       return "" unless rule
 
-      _pat, _re, tag, depth_rule = rule
-      return "" unless tag
+      return "" unless rule.block_tag
 
-      block_tagger.transition_to(tag, depth_rule.call(match))
+      block_tagger.transition_to(rule.block_tag, rule.depth_rule.call(match))
     end
 
     def as_anchor(title)
