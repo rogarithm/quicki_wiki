@@ -10,7 +10,7 @@ module Quicki
       target = target.gsub("+", " ").gsub(/%(..)/) do
         m = Regexp.last_match(1)
         [m.hex].pack("C")
-      end
+      end.force_encoding("UTF-8")
 
       pat = target.gsub(/[+?.*()\[\]{}|\\]/) { |char| "\\#{char}" }
       regex = /\b\w*(#{pat})\w*\b/i
@@ -18,7 +18,7 @@ module Quicki
       target = target.gsub('"', "&quot;")
 
       files = Dir.children("pages").select { |name| name.match?(LINK) }.sort
-      pages = files.to_h { |file| [file, File.binread(File.join("pages", file))] }
+      pages = files.to_h { |file| [file, File.binread(File.join("pages", file)).force_encoding("UTF-8")] }
       hits = count_hits(regex, pages)
       body = gen_body(target, regex, pages)
 
