@@ -119,22 +119,20 @@ class QuickiApp
     make_resp("500 Internal Server Error", body: message)
   end
 
+  # 원본은 raw HTTP 텍스트("HTTP/1.0 ...")를 문자열로 조립했지만,
+  # Puma/Rack은 [status:Integer, headers:Hash, body:Enumerable] 3-tuple을 요구하므로
+  # 여기서만 조립 방식을 바꾼다. status/header 병합 로직 자체는 원본과 동일.
   def make_resp(
     status,
     headers = { "Content-Type" => "text/plain; charset=UTF-8" },
     body:
   )
     resp_headers = {
-      "Date" => Time.now.httpdate,
-      "Connection" => "close",
       "Content-Length" => body.bytesize.to_s
     }.merge(headers)
 
-    serialized = +"HTTP/1.0 #{status}\r\n"
-    resp_headers.each do |key, value|
-      serialized << "#{key}: #{value}\r\n"
-    end
-    serialized << "\r\n" << body
+    code = status.to_s.split(" ", 2).first.to_i
+    [code, resp_headers, [body]]
   end
 end
 
