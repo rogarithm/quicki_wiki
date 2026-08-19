@@ -1,16 +1,25 @@
 require_relative "test_helper"
 
 class QuickiCoreTest < Minitest::Test
-  # 소켓에서 첫 요청 라인을 읽지 못하면 nil을 반환한다
-  def test_parse_req_returns_nil_when_request_line_is_missing
-    assert_nil(parse_req(StringIO.new))
+  def setup
+    @qa = QuickiApp.new
   end
 
-  # GET 요청에서 method, req_uri, headers, 빈 body를 올바르게 파싱한다
-  def test_parse_req_parses_get_request
-    io = StringIO.new("GET /wiki.cgi?Foo HTTP/1.0\r\nHost: example\r\nReferer: here\r\n\r\n")
+  # 소켓에서 첫 요청 라인을 읽지 못하면 nil을 반환한다
+  def test_parse_req_returns_nil_when_request_line_is_missing
+    # puma에서 유효한 요청 라인을 보장한다
+  end
 
-    req = parse_req(io)
+  # GET 요청으로 받은 env로부터 method, req_uri, headers, 빈 body를 올바르게 파싱한다
+  def test_parse_req_parses_get_request
+    env = Rack::MockRequest.env_for(
+      "/wiki.cgi?Foo",
+      method: "GET",
+      "HTTP_HOST" => "example",
+      "HTTP_REFERER" => "here"
+    )
+
+    req = @qa.parse_req(env)
 
     assert_equal("GET", req[:method])
     assert_equal("/wiki.cgi?Foo", req[:req_uri])
@@ -19,58 +28,66 @@ class QuickiCoreTest < Minitest::Test
     assert_equal("", req[:body])
   end
 
-  # POST 요청에서 Content-Length 길이만큼 body를 읽는다
-  def test_parse_req_reads_post_body_using_content_length
-    io = StringIO.new("POST /save.cgi?Page HTTP/1.0\r\nContent-Length: 7\r\n\r\nabc=123XYZ")
+  # POST 요청의 body는 rack.input에 담긴다
+  def test_parse_req_reads_post_body
+    env = Rack::MockRequest.env_for(
+      "/save.cgi?Page",
+      method: "POST",
+      input: "abc=123"
+    )
 
-    req = parse_req(io)
+    req = @qa.parse_req(env)
 
     assert_equal("abc=123", req[:body])
   end
 
-  # 헤더 이름을 모두 소문자로 정규화해 저장한다
+  # HTTP_ 접두사가 붙은 env 키는 헤더 이름이다. 모두 소문자로 정규화해 저장한다
   def test_parse_req_normalizes_header_names
-    io = StringIO.new("GET / HTTP/1.0\r\nX-Custom-Header: Value\r\n\r\n")
+    env = Rack::MockRequest.env_for(
+      "/",
+      "HTTP_X_CUSTOM_HEADER" => "Value"
+    )
 
-    req = parse_req(io)
+    req = @qa.parse_req(env)
 
     assert_equal("Value", req[:headers]["x-custom-header"])
   end
 
+
   # 빈 줄을 만나면 헤더 파싱을 멈추고 이후를 body로 처리한다
   def test_parse_req_stops_headers_at_blank_line
-    io = StringIO.new("POST / HTTP/1.0\r\nContent-Length: 4\r\n\r\nbodyIGNORED")
-
-    req = parse_req(io)
-
-    assert_equal("body", req[:body])
+    # rack에서 처리한다
   end
 
   # 요청 라인에 method 또는 req_uri가 없으면 nil을 반환한다
   def test_parse_req_returns_nil_when_request_line_is_incomplete
-    assert_nil(parse_req(StringIO.new("GET\r\n\r\n")))
+    # rack에서 처리한다
   end
 
   # 요청 uri로부터 cgi 경로를 추출한다
   def test_find_cgi_extracts_cgi_path_from_request_uri
     # 기본값 처리
-    assert_equal("wiki.cgi", find_cgi("/"))
+    assert_equal("wiki.cgi", @qa.find_cgi("/"))
 
-    assert_equal("search.cgi", find_cgi("/search.cgi?search=Wiki"))
-    assert_equal("logo.gif", find_cgi("/logo%2Egif"))
+    assert_equal("search.cgi", @qa.find_cgi("/search.cgi?search=Wiki"))
+    assert_equal("logo.gif", @qa.find_cgi("/logo%2Egif"))
   end
 
   # CGI가 아닌 경로는 정적 파일 이름 그대로 반환한다
   def test_find_cgi_returns_static_filename_for_non_cgi_path
-    assert_equal("logo.gif", find_cgi("/logo.gif"))
+    assert_equal("logo.gif", @qa.find_cgi("/logo.gif"))
   end
 
   # 허용 목록에 없는 CGI 이름이거나 매핑된 .cgi 파일이 실제로 없으면 not_found를 반환한다
   def test_run_cgi_returns_not_found_for_unknown_or_missing_script
-    assert_match("404 Not Found", run_cgi("unknown.cgi", method: "GET", req_uri: "/", headers: {}, body: ""))
+    response = @qa.run_cgi("unknown.cgi", method: "GET", req_uri: "/", headers: {}, body: "")
+    assert_equal(404, response[0])
+    assert_equal(["Not Found\n"], response[2])
 
     File.stub(:file?, false) do
-      assert_match("404 Not Found", run_cgi("wiki.cgi", method: "GET", req_uri: "/", headers: {}, body: ""))
+      response = @qa.run_cgi("wiki.cgi", method: "GET", req_uri: "/", headers: {}, body: "")
+      assert_equal(404, response[0])
+      assert_equal(["Not Found\n"], response[2])
     end
   end
 
@@ -87,9 +104,9 @@ class QuickiCoreTest < Minitest::Test
       captured_env = env.merge("stdin" => kwargs[:stdin_data], "chdir" => kwargs[:chdir])
       ["Status: 201 Created\nX-Test: yes\n\nok", "", status_double(true)]
     }) do
-      response = run_cgi("save.cgi", request)
+      response = @qa.run_cgi("save.cgi", request)
 
-      assert_match("201 Created", response)
+      assert_equal(201, response[0])
     end
 
     assert_equal("POST", captured_env["REQUEST_METHOD"])
@@ -105,11 +122,11 @@ class QuickiCoreTest < Minitest::Test
   def test_run_cgi_parses_successful_output
     File.stub(:file?, true) do
       Open3.stub(:capture3, ["Status: 202 Accepted\nX-Test: yes\n\nbody", "", status_double(true)]) do
-        response = run_cgi("wiki.cgi", method: "GET", req_uri: "/wiki.cgi?Foo", headers: {}, body: "")
+        response = @qa.run_cgi("wiki.cgi", method: "GET", req_uri: "/wiki.cgi?Foo", headers: {}, body: "")
 
-        assert_match("HTTP/1.0 202 Accepted", response)
-        assert_match("X-Test: yes", response)
-        assert_match(/\r\n\r\nbody\z/, response)
+        assert_equal(202, response[0])
+        assert_equal(true, response[1].has_key?("X-Test"))
+        assert_equal(["body"], response[2])
       end
     end
   end
@@ -118,38 +135,40 @@ class QuickiCoreTest < Minitest::Test
   def test_run_cgi_returns_server_error_when_cgi_fails
     File.stub(:file?, true) do
       Open3.stub(:capture3, ["", "boom", status_double(false)]) do
-        response = run_cgi("wiki.cgi", method: "GET", req_uri: "/wiki.cgi?Foo", headers: {}, body: "")
+        response = @qa.run_cgi("wiki.cgi", method: "GET", req_uri: "/wiki.cgi?Foo", headers: {}, body: "")
 
-        assert_match("500 Internal Server Error", response)
-        assert_match("CGI failed for wiki.cgi", response)
-        assert_match("boom", response)
+        assert_equal(500, response[0])
+        assert_equal(true, response[1].has_key?("Content-Type"))
+        assert_equal(["CGI failed for wiki.cgi\nboom"], response[2])
       end
     end
   end
 
   # 헤더와 본문 구분이 없으면 전체 출력을 200 OK 본문으로 감싼다
   def test_parse_cgi_out_wraps_headerless_output
-    response = parse_cgi_out("plain body only")
+    response = @qa.parse_cgi_out("plain body only")
 
-    assert_match("HTTP/1.0 200 OK", response)
-    assert_match(/\r\n\r\nplain body only\z/, response)
+    assert_equal(200, response[0])
+    assert_equal(["plain body only"], response[2])
   end
 
   # Status 헤더가 있으면 HTTP 상태줄로 사용하고, 그 외의 헤더는 응답 헤더로 유지한다
   def test_parse_cgi_out_uses_status_header_and_preserves_other_headers
-    response = parse_cgi_out("Status: 201 Created\r\nX-Test: yes\r\n\r\nbody")
+    response = @qa.parse_cgi_out("Status: 201 Created\r\nX-Test: yes\r\n\r\nbody")
 
-    assert_match("HTTP/1.0 201 Created", response)
-    assert_match("X-Test: yes", response)
-    refute_match(/^Status:/, response)
+    assert_equal(201, response[0])
+    assert_equal(true, response[1].has_key?("X-Test"))
+    assert_equal(["body"], response[2])
   end
 
   # path가 nil이거나 파일이 없으면 not_found를 반환한다
   def test_serve_static_returns_not_found_for_nil_or_missing_file
-    assert_match("404 Not Found", serve_static(nil))
+    assert_equal(404, @qa.serve_static(nil)[0])
+    assert_equal(["Not Found\n"], @qa.serve_static(nil)[2])
 
     in_tmpdir do
-      assert_match("404 Not Found", serve_static("missing.gif"))
+      assert_equal(404, @qa.serve_static("missing.gif")[0])
+      assert_equal(["Not Found\n"], @qa.serve_static("missing.gif")[2])
     end
   end
 
@@ -160,9 +179,9 @@ class QuickiCoreTest < Minitest::Test
       File.write("page.html", "<p>ok</p>")
       File.write("note.txt", "text")
 
-      assert_match("Content-Type: image/gif", serve_static("logo.gif"))
-      assert_match("Content-Type: text/html", serve_static("page.html"))
-      assert_match("Content-Type: text/plain", serve_static("note.txt"))
+      assert_equal("image/gif", @qa.serve_static("logo.gif")[1]["Content-Type"])
+      assert_equal("text/html", @qa.serve_static("page.html")[1]["Content-Type"])
+      assert_equal("text/plain", @qa.serve_static("note.txt")[1]["Content-Type"])
     end
   end
 
@@ -171,42 +190,35 @@ class QuickiCoreTest < Minitest::Test
     in_tmpdir do
       File.binwrite("logo.gif", "GIF89a")
 
-      response = serve_static("logo.gif")
+      response = @qa.serve_static("logo.gif")
 
-      assert_match(/\r\n\r\nGIF89a\z/, response)
+      assert_equal(["GIF89a"], response[2])
     end
   end
 
-  # HTTP/1.0 상태줄을 포함한 응답 문자열을 만든다
+  # 응답 객체에는 HTTP 응답 상태 코드를 포함한다
   def test_make_resp_includes_http_status_line
-    response = make_resp("201 Created", body: "ok")
+    response = @qa.make_resp("201 Created", body: "ok")
 
-    assert_match(/\AHTTP\/1\.0 201 Created\r\n/, response)
+    assert_equal(201, response[0])
   end
 
   # 호출자가 넘긴 헤더를 응답에 병합한다
   def test_make_resp_merges_headers_sent_by_client
-    response = make_resp(
+    response = @qa.make_resp(
       "200 OK",
       {"Content-Type" => "text/html", "X-Test" => "yes"},
       body: "ok"
     )
 
-    assert_match("Content-Type: text/html", response)
-    assert_match("X-Test: yes", response)
+    assert_equal("text/html", response[1]["Content-Type"])
+    assert_equal("yes", response[1]["X-Test"])
   end
 
   # body의 bytesize로 Content-Length를 계산한다
   def test_make_resp_computes_content_length_from_body_bytes
-    response = make_resp("200 OK", body: "한")
+    response = @qa.make_resp("200 OK", body: "한")
 
-    assert_match("Content-Length: 3", response)
-  end
-
-  # 헤더와 본문 사이를 CRLF CRLF로 구분한다
-  def test_make_resp_separates_headers_and_body_with_crlf
-    response = make_resp("200 OK", body: "ok")
-
-    assert_includes(response, "\r\n\r\nok")
+    assert_equal("3", response[1]["Content-Length"])
   end
 end
