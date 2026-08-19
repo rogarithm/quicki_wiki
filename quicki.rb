@@ -10,31 +10,49 @@ class QuickiApp
   ROOT = File.expand_path(__dir__)
   CGI_NAMES = %w[wiki edit save search changes refcount].freeze
 
-  def parse_req(io)
-    req_line = io.gets
-    return if req_line.nil?
+  # 원본 accept 루프를 대체하는 Rack 엔트리포인트.
+  # method/cgi 판별, 로깅, 디스패치 로직은 원본 loop 내부와 동일하게 유지.
+  def call(env)
+    req = parse_req(env)
+    cgi = find_cgi(req[:req_uri])
 
-    method, req_uri, _version = req_line.strip.split(/\s+/, 3)
-    return if method.nil? || req_uri.nil?
+    response =
+      case req[:method]
+      when "GET", "POST"
+        if cgi.end_with?(".cgi")
+          run_cgi(cgi, req)
+        else
+          serve_static(cgi)
+        end
+      else
+        make_resp("405 Method Not Allowed", body: "Method Not Allowed\n")
+      end
 
+    response
+  rescue StandardError => e
+    server_error("#{e.class}: #{e.message}\n")
+  end
+
+  # 기존 parse_req(소켓에서 직접 읽던 부분)를 Rack env 기반으로 대체.
+  # 반환 형태는 원본 parse_req와 동일하게 맞춰서 이후 로직을 그대로 재사용한다.
+  def parse_req(env)
     headers = {}
-    while (line = io.gets)
-      # line == "\r\n"이면 이후로 body가 시작되므로 while을 빠져나간다
-      line = line.delete("\r\n")
-      break if line.empty?
+    env.each do |k, v|
+      next unless k.start_with?("HTTP_")
 
-      k, v = line.split(/:\s*/, 2)
-      headers[k.downcase] = v.to_s
+      name = k.sub(/\AHTTP_/, "").split("_").join("-").downcase
+      headers[name] = v
     end
 
-    content_length = headers.fetch('content-length', '0').to_i
-    body = content_length.positive? ? io.read(content_length) : ''
+    query = env["QUERY_STRING"].to_s
+    req_uri = env["PATH_INFO"].to_s
+    req_uri += "?#{query}" unless query.empty?
 
     {
-      method: method,
+      method: env["REQUEST_METHOD"],
       req_uri: req_uri,
       headers: headers,
-      body: body
+      body: env["rack.input"]&.read.to_s
     }
   end
 

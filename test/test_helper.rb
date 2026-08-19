@@ -4,6 +4,7 @@ require "tmpdir"
 require "fileutils"
 require "socket"
 require "open3"
+require "rack/mock"
 
 TEST_ROOT = File.expand_path("..", __dir__)
 

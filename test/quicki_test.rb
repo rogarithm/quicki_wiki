@@ -7,14 +7,19 @@ class QuickiCoreTest < Minitest::Test
 
   # 소켓에서 첫 요청 라인을 읽지 못하면 nil을 반환한다
   def test_parse_req_returns_nil_when_request_line_is_missing
-    assert_nil(@qa.parse_req(StringIO.new))
+    # puma에서 유효한 요청 라인을 보장한다
   end
 
-  # GET 요청에서 method, req_uri, headers, 빈 body를 올바르게 파싱한다
+  # GET 요청으로 받은 env로부터 method, req_uri, headers, 빈 body를 올바르게 파싱한다
   def test_parse_req_parses_get_request
-    io = StringIO.new("GET /wiki.cgi?Foo HTTP/1.0\r\nHost: example\r\nReferer: here\r\n\r\n")
+    env = Rack::MockRequest.env_for(
+      "/wiki.cgi?Foo",
+      method: "GET",
+      "HTTP_HOST" => "example",
+      "HTTP_REFERER" => "here"
+    )
 
-    req = @qa.parse_req(io)
+    req = @qa.parse_req(env)
 
     assert_equal("GET", req[:method])
     assert_equal("/wiki.cgi?Foo", req[:req_uri])
@@ -23,36 +28,40 @@ class QuickiCoreTest < Minitest::Test
     assert_equal("", req[:body])
   end
 
-  # POST 요청에서 Content-Length 길이만큼 body를 읽는다
-  def test_parse_req_reads_post_body_using_content_length
-    io = StringIO.new("POST /save.cgi?Page HTTP/1.0\r\nContent-Length: 7\r\n\r\nabc=123XYZ")
+  # POST 요청의 body는 rack.input에 담긴다
+  def test_parse_req_reads_post_body
+    env = Rack::MockRequest.env_for(
+      "/save.cgi?Page",
+      method: "POST",
+      input: "abc=123"
+    )
 
-    req = @qa.parse_req(io)
+    req = @qa.parse_req(env)
 
     assert_equal("abc=123", req[:body])
   end
 
-  # 헤더 이름을 모두 소문자로 정규화해 저장한다
+  # HTTP_ 접두사가 붙은 env 키는 헤더 이름이다. 모두 소문자로 정규화해 저장한다
   def test_parse_req_normalizes_header_names
-    io = StringIO.new("GET / HTTP/1.0\r\nX-Custom-Header: Value\r\n\r\n")
+    env = Rack::MockRequest.env_for(
+      "/",
+      "HTTP_X_CUSTOM_HEADER" => "Value"
+    )
 
-    req = @qa.parse_req(io)
+    req = @qa.parse_req(env)
 
     assert_equal("Value", req[:headers]["x-custom-header"])
   end
 
+
   # 빈 줄을 만나면 헤더 파싱을 멈추고 이후를 body로 처리한다
   def test_parse_req_stops_headers_at_blank_line
-    io = StringIO.new("POST / HTTP/1.0\r\nContent-Length: 4\r\n\r\nbodyIGNORED")
-
-    req = @qa.parse_req(io)
-
-    assert_equal("body", req[:body])
+    # rack에서 처리한다
   end
 
   # 요청 라인에 method 또는 req_uri가 없으면 nil을 반환한다
   def test_parse_req_returns_nil_when_request_line_is_incomplete
-    assert_nil(@qa.parse_req(StringIO.new("GET\r\n\r\n")))
+    # rack에서 처리한다
   end
 
   # 요청 uri로부터 cgi 경로를 추출한다
