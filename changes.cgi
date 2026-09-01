@@ -20,7 +20,7 @@ module Quicki
       par = {}
       par["body"] = gen_body(dated_pages, max)
       par["title"] = "Recent Changes"
-      par["page"] = "http:changes.cgi"
+      par["page"] = "changes.cgi"
 
       template = File.binread("template.html")
       template.gsub!(/\$(\w+)/) do

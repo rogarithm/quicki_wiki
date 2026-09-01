@@ -5,6 +5,7 @@ module Quicki
     MARK = "\uE000"
     LINK = /[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]+)+/
     PROTOCOL = /(?:http|ftp|mailto|file|gopher|telnet|news)/
+    INTERNAL_CGI = /(changes|refcount)\.cgi/
     MONTHS = %w[January February March April May June July August September October November December]
 
     def handle_req
@@ -88,6 +89,14 @@ module Quicki
 
       plain_url = /\b#{PROTOCOL.source}:[^\s<>\[\]"'()]*[^\s<>\[\]"'(),.?]/
       line = line.gsub(plain_url) do |match|
+        current_idx = index
+        index += 1
+        in_place_urls[current_idx] = match
+        "#{MARK}#{current_idx}#{MARK}"
+      end
+
+      internal_cgi_url = /\b#{INTERNAL_CGI.source}\b/
+      line = line.gsub(internal_cgi_url) do |match|
         current_idx = index
         index += 1
         in_place_urls[current_idx] = match

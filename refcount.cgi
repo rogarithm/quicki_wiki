@@ -13,7 +13,7 @@ module Quicki
       par = {}
       par["summary"] = ""
       par["title"] = "Page References"
-      par["page"] = "http:pagerefs.cgi"
+      par["page"] = "refcount.cgi"
       par["body"] = gen_body(pages)
 
       template = File.binread("template.html")

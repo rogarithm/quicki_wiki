@@ -59,6 +59,16 @@ class WikiBrowserTest < Minitest::Test
     assert_includes(html, '<a href="http://example.com/path">http://example.com/path</a>')
   end
 
+  # 사전에 추출한 내부 CGI URL placeholder를 최종 HTML로 복원한다
+  def test_render_wiki_doc_restores_internal_cgi_urls
+    internal_cgis = %w[changes.cgi refcount.cgi]
+    internal_cgis.each do |internal_cgi|
+      html = @browser.render_wiki_doc(internal_cgi)
+
+      assert_includes(html, "<a href=\"#{internal_cgi}\">#{internal_cgi}</a>")
+    end
+  end
+
   # 문서 끝에서 아직 열린 블록 태그를 모두 닫는다
   def test_render_wiki_doc_closes_open_block_tags
     html = @browser.render_wiki_doc("* item")

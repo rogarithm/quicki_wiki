@@ -73,7 +73,7 @@ class ChangesCgiTest < Minitest::Test
       out, _err = capture_io { @viewer.handle_req }
 
       assert_includes(out, "TITLE:Recent Changes")
-      assert_includes(out, "PAGE:http:changes.cgi")
+      assert_includes(out, "PAGE:changes.cgi")
       assert_includes(out, "BODY:<dl>")
     end
   end
