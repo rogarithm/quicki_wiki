@@ -1,18 +1,27 @@
 #!/usr/bin/env ruby
 
-require 'socket'
+require 'sinatra/base'
 require 'cgi'
 require 'open3'
 require 'rbconfig'
-require 'time'
 
-class QuickiApp
+class QuickiApp < Sinatra::Base
   ROOT = File.expand_path(__dir__)
   CGI_NAMES = %w[wiki edit save search changes refcount].freeze
 
+  get '/*' do
+    status, headers, body = handle(request.env)
+    [status, headers, body]
+  end
+
+  post '/*' do
+    status, headers, body = handle(request.env)
+    [status, headers, body]
+  end
+
   # 원본 accept 루프를 대체하는 Rack 엔트리포인트.
   # method/cgi 판별, 로깅, 디스패치 로직은 원본 loop 내부와 동일하게 유지.
-  def call(env)
+  def handle(env)
     req = parse_req(env)
     cgi = find_cgi(req[:req_uri])
 

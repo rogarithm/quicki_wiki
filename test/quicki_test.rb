@@ -2,7 +2,7 @@ require_relative "test_helper"
 
 class QuickiCoreTest < Minitest::Test
   def setup
-    @qa = QuickiApp.new
+    @qa = QuickiApp.new!
   end
 
   # 소켓에서 첫 요청 라인을 읽지 못하면 nil을 반환한다
