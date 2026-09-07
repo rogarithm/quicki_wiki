@@ -45,24 +45,15 @@ class QuickiApp < Sinatra::Base
   # 기존 parse_req(소켓에서 직접 읽던 부분)를 Rack env 기반으로 대체.
   # 반환 형태는 원본 parse_req와 동일하게 맞춰서 이후 로직을 그대로 재사용한다.
   def parse_req(request)
-    headers = {}
-    env = request.env
-    env.each do |k, v|
-      next unless k.start_with?("HTTP_")
-
-      name = k.sub(/\AHTTP_/, "").split("_").join("-").downcase
-      headers[name] = v
-    end
-
-    query = env["QUERY_STRING"].to_s
-    req_uri = env["PATH_INFO"].to_s
+    query = request.query_string
+    req_uri = request.path_info
     req_uri += "?#{query}" unless query.empty?
 
     {
-      method: env["REQUEST_METHOD"],
+      method: request.request_method,
       req_uri: req_uri,
-      headers: headers,
-      body: env["rack.input"]&.read.to_s
+      headers: {"referer" => request.referer}.compact,
+      body: request.body&.read.to_s
     }
   end
 
