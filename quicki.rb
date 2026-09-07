@@ -10,13 +10,18 @@ class QuickiApp < Sinatra::Base
   CGI_NAMES = %w[wiki edit save search changes refcount].freeze
 
   get '/*' do
-    status, headers, body = handle(request)
-    [status, headers, body]
+    handle(request)
   end
 
   post '/*' do
-    status, headers, body = handle(request)
-    [status, headers, body]
+    handle(request)
+  end
+
+  %w[put patch delete options trace connect].map(&:upcase) # verb는 꼭 대문자여야 한다
+                      .each do |verb|
+    route verb, '/*' do
+      make_resp("405 Method Not Allowed", body: "Method Not Allowed\n")
+    end
   end
 
   # 원본 accept 루프를 대체하는 Rack 엔트리포인트.
@@ -25,19 +30,7 @@ class QuickiApp < Sinatra::Base
     req = parse_req(request)
     cgi = find_cgi(req[:req_uri])
 
-    response =
-      case req[:method]
-      when "GET", "POST"
-        if cgi.end_with?(".cgi")
-          run_cgi(cgi, req)
-        else
-          serve_static(cgi)
-        end
-      else
-        make_resp("405 Method Not Allowed", body: "Method Not Allowed\n")
-      end
-
-    response
+    cgi.end_with?(".cgi") ? run_cgi(cgi, req) : serve_static(cgi)
   rescue StandardError => e
     server_error("#{e.class}: #{e.message}\n")
   end
