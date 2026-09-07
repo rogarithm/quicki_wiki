@@ -10,19 +10,19 @@ class QuickiApp < Sinatra::Base
   CGI_NAMES = %w[wiki edit save search changes refcount].freeze
 
   get '/*' do
-    status, headers, body = handle(request.env)
+    status, headers, body = handle(request)
     [status, headers, body]
   end
 
   post '/*' do
-    status, headers, body = handle(request.env)
+    status, headers, body = handle(request)
     [status, headers, body]
   end
 
   # 원본 accept 루프를 대체하는 Rack 엔트리포인트.
   # method/cgi 판별, 로깅, 디스패치 로직은 원본 loop 내부와 동일하게 유지.
-  def handle(env)
-    req = parse_req(env)
+  def handle(request)
+    req = parse_req(request)
     cgi = find_cgi(req[:req_uri])
 
     response =
@@ -44,8 +44,9 @@ class QuickiApp < Sinatra::Base
 
   # 기존 parse_req(소켓에서 직접 읽던 부분)를 Rack env 기반으로 대체.
   # 반환 형태는 원본 parse_req와 동일하게 맞춰서 이후 로직을 그대로 재사용한다.
-  def parse_req(env)
+  def parse_req(request)
     headers = {}
+    env = request.env
     env.each do |k, v|
       next unless k.start_with?("HTTP_")
 

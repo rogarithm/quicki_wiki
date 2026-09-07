@@ -18,14 +18,15 @@ class QuickiCoreTest < Minitest::Test
       "HTTP_HOST" => "example",
       "HTTP_REFERER" => "here"
     )
+    req = Rack::Request.new(env)
 
-    req = @qa.parse_req(env)
+    parsed_req = @qa.parse_req(req)
 
-    assert_equal("GET", req[:method])
-    assert_equal("/wiki.cgi?Foo", req[:req_uri])
-    assert_equal("example", req[:headers]["host"])
-    assert_equal("here", req[:headers]["referer"])
-    assert_equal("", req[:body])
+    assert_equal("GET", parsed_req[:method])
+    assert_equal("/wiki.cgi?Foo", parsed_req[:req_uri])
+    assert_equal("example", parsed_req[:headers]["host"])
+    assert_equal("here", parsed_req[:headers]["referer"])
+    assert_equal("", parsed_req[:body])
   end
 
   # POST 요청의 body는 rack.input에 담긴다
@@ -35,10 +36,11 @@ class QuickiCoreTest < Minitest::Test
       method: "POST",
       input: "abc=123"
     )
+    req = Rack::Request.new(env)
 
-    req = @qa.parse_req(env)
+    parsed_req = @qa.parse_req(req)
 
-    assert_equal("abc=123", req[:body])
+    assert_equal("abc=123", parsed_req[:body])
   end
 
   # HTTP_ 접두사가 붙은 env 키는 헤더 이름이다. 모두 소문자로 정규화해 저장한다
@@ -47,10 +49,11 @@ class QuickiCoreTest < Minitest::Test
       "/",
       "HTTP_X_CUSTOM_HEADER" => "Value"
     )
+    req = Rack::Request.new(env)
 
-    req = @qa.parse_req(env)
+    parsed_req = @qa.parse_req(req)
 
-    assert_equal("Value", req[:headers]["x-custom-header"])
+    assert_equal("Value", parsed_req[:headers]["x-custom-header"])
   end
 
 
