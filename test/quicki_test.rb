@@ -5,10 +5,10 @@ class QuickiCoreTest < Minitest::Test
     @qa = QuickiApp.new!
   end
 
-  # 소켓에서 첫 요청 라인을 읽지 못하면 nil을 반환한다
-  def test_parse_req_returns_nil_when_request_line_is_missing
-    # puma에서 유효한 요청 라인을 보장한다
-  end
+  # 다음 시나리오는 이제 QuickiApp의 책임이 아니라 Puma/Rack이 보장한다:
+  # - 요청 라인이 없거나 불완전한 경우 (puma에서 유효한 요청 라인을 보장)
+  # - 빈 줄을 만나면 헤더 파싱을 멈추고 이후를 body로 처리 (rack에서 처리)
+  # - 요청 라인에 method 또는 req_uri가 없는 경우 처리 (rack에서 처리)
 
   # GET 요청으로 받은 env로부터 method, req_uri, headers, 빈 body를 올바르게 파싱한다
   def test_parse_req_parses_get_request
@@ -41,16 +41,6 @@ class QuickiCoreTest < Minitest::Test
     assert_equal("abc=123", parsed_req[:body])
   end
 
-  # 빈 줄을 만나면 헤더 파싱을 멈추고 이후를 body로 처리한다
-  def test_parse_req_stops_headers_at_blank_line
-    # rack에서 처리한다
-  end
-
-  # 요청 라인에 method 또는 req_uri가 없으면 nil을 반환한다
-  def test_parse_req_returns_nil_when_request_line_is_incomplete
-    # rack에서 처리한다
-  end
-
   # 요청 uri로부터 cgi 경로를 추출한다
   def test_find_cgi_extracts_cgi_path_from_request_uri
     # 기본값 처리
@@ -67,12 +57,14 @@ class QuickiCoreTest < Minitest::Test
 
   # 허용 목록에 없는 CGI 이름이거나 매핑된 .cgi 파일이 실제로 없으면 not_found를 반환한다
   def test_run_cgi_returns_not_found_for_unknown_or_missing_script
-    response = @qa.run_cgi("unknown.cgi", method: "GET", req_uri: "/", headers: {}, body: "")
+    request = {method: "GET", req_uri: "/", headers: {}, body: ""}
+    response = @qa.run_cgi("unknown.cgi", request)
     assert_equal(404, response[0])
     assert_equal(["Not Found\n"], response[2])
 
     File.stub(:file?, false) do
-      response = @qa.run_cgi("wiki.cgi", method: "GET", req_uri: "/", headers: {}, body: "")
+      request = {method: "GET", req_uri: "/", headers: {}, body: ""}
+      response = @qa.run_cgi("wiki.cgi", request)
       assert_equal(404, response[0])
       assert_equal(["Not Found\n"], response[2])
     end
@@ -109,7 +101,8 @@ class QuickiCoreTest < Minitest::Test
   def test_run_cgi_parses_successful_output
     File.stub(:file?, true) do
       Open3.stub(:capture3, ["Status: 202 Accepted\nX-Test: yes\n\nbody", "", status_double(true)]) do
-        response = @qa.run_cgi("wiki.cgi", method: "GET", req_uri: "/wiki.cgi?Foo", headers: {}, body: "")
+        request = {method: "GET", req_uri: "/wiki.cgi?Foo", headers: {}, body: ""}
+        response = @qa.run_cgi("wiki.cgi", request)
 
         assert_equal(202, response[0])
         assert_equal(true, response[1].has_key?("X-Test"))
@@ -122,7 +115,8 @@ class QuickiCoreTest < Minitest::Test
   def test_run_cgi_returns_server_error_when_cgi_fails
     File.stub(:file?, true) do
       Open3.stub(:capture3, ["", "boom", status_double(false)]) do
-        response = @qa.run_cgi("wiki.cgi", method: "GET", req_uri: "/wiki.cgi?Foo", headers: {}, body: "")
+        request = {method: "GET", req_uri: "/wiki.cgi?Foo", headers: {}, body: ""}
+        response = @qa.run_cgi("wiki.cgi", request)
 
         assert_equal(500, response[0])
         assert_equal(true, response[1].has_key?("Content-Type"))
