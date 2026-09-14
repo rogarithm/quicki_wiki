@@ -9,6 +9,10 @@ class QuickiApp < Sinatra::Base
   ROOT = File.expand_path(__dir__)
   CGI_NAMES = %w[wiki edit save search changes refcount].freeze
 
+  configure do
+    enable :logging
+  end
+
   get '/*' do
     handle(request)
   end
@@ -29,6 +33,8 @@ class QuickiApp < Sinatra::Base
   def handle(request)
     req = parse_req(request)
     cgi = find_cgi(req[:req_uri])
+
+    logger.info("#{req[:method]} #{req[:req_uri]} -> #{cgi}")
 
     cgi.end_with?(".cgi") ? run_cgi(cgi, req) : serve_static(cgi)
   rescue StandardError => e
