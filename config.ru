@@ -7,4 +7,4 @@ use Rack::Auth::Basic, "Quicki Wiki" do |username, password|
     Rack::Utils.secure_compare(password, ENV.fetch("WIKI_PASSWORD"))
 end
 
-run QuickiApp.new
+run QuickiApp

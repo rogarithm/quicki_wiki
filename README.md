@@ -1,14 +1,16 @@
 ### 소개
 
-- Ruby로 작성된 간단한 CGI 기반 위키 애플리케이션
+- Ruby로 작성된 CGI/Sinatra 기반 위키 애플리케이션
 
 ### 사용 기술
 
 - Ruby
 - minitest
 - rack
+- sinatra
 - puma
 - dotenv
+- rack-test
 
 ### 실행 방법
 
@@ -30,6 +32,8 @@ bundle exec puma -p 8000
 ```text
 http://localhost:8000/
 ```
+
+애플리케이션은 config.ru에서 QuickiApp Sinatra 앱으로 실행된다.<br>GET/POST 요청은 Sinatra 라우트를 거쳐 기존 CGI 스크립트로 디스패치되고, 그 외 메서드는 405 Method Not Allowed로 응답한다.
 
 Rack에서 제공하는 Rack::Auth::Basic과 env gem으로 페이지 접근 권한을 제한한다.<br>.env 파일에 다음과 같이 환경변수 값을 설정하고,
 ```dotenv

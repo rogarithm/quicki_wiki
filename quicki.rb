@@ -1,58 +1,58 @@
 #!/usr/bin/env ruby
 
-require 'socket'
+require 'sinatra/base'
 require 'cgi'
 require 'open3'
 require 'rbconfig'
-require 'time'
 
-class QuickiApp
+class QuickiApp < Sinatra::Base
   ROOT = File.expand_path(__dir__)
   CGI_NAMES = %w[wiki edit save search changes refcount].freeze
 
+  configure do
+    enable :logging
+  end
+
+  get '/*' do
+    handle(request)
+  end
+
+  post '/*' do
+    handle(request)
+  end
+
+  %w[put patch delete options trace connect].map(&:upcase) # verb는 꼭 대문자여야 한다
+                      .each do |verb|
+    route verb, '/*' do
+      make_resp("405 Method Not Allowed", body: "Method Not Allowed\n")
+    end
+  end
+
   # 원본 accept 루프를 대체하는 Rack 엔트리포인트.
   # method/cgi 판별, 로깅, 디스패치 로직은 원본 loop 내부와 동일하게 유지.
-  def call(env)
-    req = parse_req(env)
+  def handle(request)
+    req = parse_req(request)
     cgi = find_cgi(req[:req_uri])
 
-    response =
-      case req[:method]
-      when "GET", "POST"
-        if cgi.end_with?(".cgi")
-          run_cgi(cgi, req)
-        else
-          serve_static(cgi)
-        end
-      else
-        make_resp("405 Method Not Allowed", body: "Method Not Allowed\n")
-      end
+    logger.info("#{req[:method]} #{req[:req_uri]} -> #{cgi}")
 
-    response
+    cgi.end_with?(".cgi") ? run_cgi(cgi, req) : serve_static(cgi)
   rescue StandardError => e
     server_error("#{e.class}: #{e.message}\n")
   end
 
   # 기존 parse_req(소켓에서 직접 읽던 부분)를 Rack env 기반으로 대체.
   # 반환 형태는 원본 parse_req와 동일하게 맞춰서 이후 로직을 그대로 재사용한다.
-  def parse_req(env)
-    headers = {}
-    env.each do |k, v|
-      next unless k.start_with?("HTTP_")
-
-      name = k.sub(/\AHTTP_/, "").split("_").join("-").downcase
-      headers[name] = v
-    end
-
-    query = env["QUERY_STRING"].to_s
-    req_uri = env["PATH_INFO"].to_s
+  def parse_req(request)
+    query = request.query_string
+    req_uri = request.path_info
     req_uri += "?#{query}" unless query.empty?
 
     {
-      method: env["REQUEST_METHOD"],
+      method: request.request_method,
       req_uri: req_uri,
-      headers: headers,
-      body: env["rack.input"]&.read.to_s
+      headers: {"referer" => request.referer}.compact,
+      body: request.body&.read.to_s
     }
   end
 

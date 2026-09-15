@@ -2,9 +2,9 @@ require "minitest/autorun"
 require "stringio"
 require "tmpdir"
 require "fileutils"
-require "socket"
 require "open3"
 require "rack/mock"
+require "rack/test"
 
 TEST_ROOT = File.expand_path("..", __dir__)
 
