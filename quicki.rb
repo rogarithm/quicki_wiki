@@ -17,12 +17,14 @@ class QuickiApp < Sinatra::Base
     logger.info("#{request.request_method} #{request.path_info}?#{request.query_string}")
   end
 
-  get '/*' do
-    handle(request)
-  end
+  CGI_NAMES.each do |name|
+    get "/#{name}.cgi" do
+      handle("#{name}.cgi", request)
+    end
 
-  post '/*' do
-    handle(request)
+    post "/#{name}.cgi" do
+      handle("#{name}.cgi", request)
+    end
   end
 
   get '/' do
@@ -46,10 +48,8 @@ class QuickiApp < Sinatra::Base
 
   # 원본 accept 루프를 대체하는 Rack 엔트리포인트.
   # method/cgi 판별, 로깅, 디스패치 로직은 원본 loop 내부와 동일하게 유지.
-  def handle(request)
+  def handle(cgi, request)
     req = parse_req(request)
-    cgi = find_cgi(req[:req_uri])
-
     cgi.end_with?(".cgi") ? run_cgi(cgi, req) : serve_static(cgi)
   end
 
@@ -66,11 +66,6 @@ class QuickiApp < Sinatra::Base
       headers: {"referer" => request.referer}.compact,
       body: request.body&.read.to_s
     }
-  end
-
-  def find_cgi(req_uri)
-    path, _query = req_uri.split("?", 2)
-    CGI.unescape(path.sub(%r{\A/}, '')) # 문자열 시작이 / 이면 지우고 디코딩
   end
 
   def run_cgi(script_name, request)

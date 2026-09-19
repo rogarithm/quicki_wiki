@@ -70,7 +70,7 @@ class QuickiRoutesTest < Minitest::Test
   def test_server_error
     orig_handle_meth = QuickiApp.instance_method(:handle)
     QuickiApp.class_eval do
-      define_method(:handle) {|_| raise StandardError, "msg" }
+      define_method(:handle) {|_, _| raise StandardError, "msg" }
     end
 
     get "/wiki.cgi?Foo"
@@ -82,5 +82,27 @@ class QuickiRoutesTest < Minitest::Test
   end
 end
 
+class SinatraTest < Minitest::Test
+  include Rack::Test::Methods
+
+  def app
+    lambda do |env|
+      env["HTTP_HOST"] = "localhost"
+      env["SERVER_NAME"] = "localhost"
+      QuickiApp.call(env)
+    end
+  end
+
+  # sinatra에서 같은 라우트 패턴 문자열의 인코딩/디코딩된 버전을 동일하게 매칭하는지 확인한다
+  def test_decode_path_info_before_route
+    # env["sinatra.route"]에 http 메서드와 매칭된 라우트 패턴이 기록된다
+    get "/wiki%2ecgi"
+    encoded_route = last_request.env["sinatra.route"].split("/")[1].chomp
+
+    get "/wiki.cgi"
+    plain_route = last_request.env["sinatra.route"].split("/")[1].chomp
+
+    [encoded_route, plain_route].all? {|r| assert_equal(r, encoded_route)}
+    assert_equal(plain_route, encoded_route)
   end
 end

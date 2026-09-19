@@ -41,17 +41,6 @@ class QuickiCoreTest < Minitest::Test
     assert_equal("abc=123", parsed_req[:body])
   end
 
-  # 요청 uri로부터 cgi 경로를 추출한다
-  def test_find_cgi_extracts_cgi_path_from_request_uri
-    assert_equal("search.cgi", @qa.find_cgi("/search.cgi?search=Wiki"))
-    assert_equal("logo.gif", @qa.find_cgi("/logo%2Egif"))
-  end
-
-  # CGI가 아닌 경로는 정적 파일 이름 그대로 반환한다
-  def test_find_cgi_returns_static_filename_for_non_cgi_path
-    assert_equal("logo.gif", @qa.find_cgi("/logo.gif"))
-  end
-
   # 허용 목록에 없는 CGI 이름이거나 매핑된 .cgi 파일이 실제로 없으면 not_found를 반환한다
   def test_run_cgi_returns_not_found_for_unknown_or_missing_script
     request = {method: "GET", req_uri: "/", headers: {}, body: ""}
