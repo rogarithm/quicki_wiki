@@ -28,8 +28,11 @@ class QuickiApp < Sinatra::Base
   end
 
   get '/' do
-    req = parse_req(request)
-    run_cgi('wiki.cgi', req)
+    handle('wiki.cgi', request)
+  end
+
+  get '/*' do
+    serve_static(params[:splat].first)
   end
 
   %w[put patch delete options trace connect].map(&:upcase) # verb는 꼭 대문자여야 한다
@@ -50,7 +53,7 @@ class QuickiApp < Sinatra::Base
   # method/cgi 판별, 로깅, 디스패치 로직은 원본 loop 내부와 동일하게 유지.
   def handle(cgi, request)
     req = parse_req(request)
-    cgi.end_with?(".cgi") ? run_cgi(cgi, req) : serve_static(cgi)
+    run_cgi(cgi, req)
   end
 
   # 기존 parse_req(소켓에서 직접 읽던 부분)를 Rack env 기반으로 대체.
