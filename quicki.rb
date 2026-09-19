@@ -25,6 +25,11 @@ class QuickiApp < Sinatra::Base
     handle(request)
   end
 
+  get '/' do
+    req = parse_req(request)
+    run_cgi('wiki.cgi', req)
+  end
+
   %w[put patch delete options trace connect].map(&:upcase) # verb는 꼭 대문자여야 한다
                       .each do |verb|
     route verb, '/*' do
@@ -64,11 +69,8 @@ class QuickiApp < Sinatra::Base
   end
 
   def find_cgi(req_uri)
-    default_cgi = 'wiki.cgi'
-
     path, _query = req_uri.split("?", 2)
-    cgi = CGI.unescape(path.sub(%r{\A/}, '')) # 문자열 시작이 / 이면 지우고 디코딩
-    cgi.empty? ? default_cgi : cgi
+    CGI.unescape(path.sub(%r{\A/}, '')) # 문자열 시작이 / 이면 지우고 디코딩
   end
 
   def run_cgi(script_name, request)

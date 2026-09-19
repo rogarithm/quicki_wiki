@@ -43,9 +43,6 @@ class QuickiCoreTest < Minitest::Test
 
   # 요청 uri로부터 cgi 경로를 추출한다
   def test_find_cgi_extracts_cgi_path_from_request_uri
-    # 기본값 처리
-    assert_equal("wiki.cgi", @qa.find_cgi("/"))
-
     assert_equal("search.cgi", @qa.find_cgi("/search.cgi?search=Wiki"))
     assert_equal("logo.gif", @qa.find_cgi("/logo%2Egif"))
   end
