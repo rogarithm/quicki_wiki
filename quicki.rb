@@ -32,6 +32,13 @@ class QuickiApp < Sinatra::Base
     end
   end
 
+  error StandardError do |x|
+    e = env['sinatra.error']
+    status 500
+    content_type "text/plain; charset=UTF-8"
+    body "#{e.class}: #{e.message}\n"
+  end
+
   # 원본 accept 루프를 대체하는 Rack 엔트리포인트.
   # method/cgi 판별, 로깅, 디스패치 로직은 원본 loop 내부와 동일하게 유지.
   def handle(request)
@@ -39,8 +46,6 @@ class QuickiApp < Sinatra::Base
     cgi = find_cgi(req[:req_uri])
 
     cgi.end_with?(".cgi") ? run_cgi(cgi, req) : serve_static(cgi)
-  rescue StandardError => e
-    server_error("#{e.class}: #{e.message}\n")
   end
 
   # 기존 parse_req(소켓에서 직접 읽던 부분)를 Rack env 기반으로 대체.

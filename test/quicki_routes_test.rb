@@ -3,6 +3,11 @@ require_relative "test_helper"
 class QuickiRoutesTest < Minitest::Test
   include Rack::Test::Methods
 
+  def setup
+    QuickiApp.set :raise_errors, false # 에러를 sinatra 앱 바깥쪽으로 전파되지 않게 한다
+    QuickiApp.set :show_exceptions, false # 에러를 페이지로 보여주지 않는다
+  end
+
   def app
     lambda do |env|
       # Rack::Test의 default_host인 example.org는 sinatra에서 허용하는 host 목록에 없다.
@@ -60,5 +65,22 @@ class QuickiRoutesTest < Minitest::Test
 
     options "/wiki.cgi"
     assert_includes(last_response.errors, "OPTIONS /wiki.cgi")
+  end
+
+  def test_server_error
+    orig_handle_meth = QuickiApp.instance_method(:handle)
+    QuickiApp.class_eval do
+      define_method(:handle) {|_| raise StandardError, "msg" }
+    end
+
+    get "/wiki.cgi?Foo"
+    assert_equal 500, last_response.status
+    assert_includes "text/plain; charset=UTF-8", last_response.headers["content-type"]
+    assert_includes last_response.body, "StandardError: msg"
+  ensure
+    QuickiApp.define_method(:handle, orig_handle_meth)
+  end
+end
+
   end
 end
