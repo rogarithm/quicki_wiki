@@ -20,7 +20,6 @@ class QuickiRoutesTest < Minitest::Test
       Open3.stub(:capture3, ["Status: 200 OK\n\nhello", "", status_double(true)]) do
         get "/wiki.cgi?Foo"
         assert_equal(200, last_response.status)
-        assert_includes(last_response.errors, "GET /wiki.cgi?Foo -> wiki.cgi")
       end
     end
   end
@@ -44,5 +43,22 @@ class QuickiRoutesTest < Minitest::Test
   def test_options_returns_405_by_sinatra_default
     options "/wiki.cgi"
     assert_equal(405, last_response.status)
+  end
+
+  def test_logging_before_handle_route
+    get "/wiki.cgi?Foo"
+    assert_includes(last_response.errors, "GET /wiki.cgi?Foo")
+
+    put "/wiki.cgi"
+    assert_includes(last_response.errors, "PUT /wiki.cgi")
+
+    patch "/wiki.cgi"
+    assert_includes(last_response.errors, "PATCH /wiki.cgi")
+
+    delete "/wiki.cgi"
+    assert_includes(last_response.errors, "DELETE /wiki.cgi")
+
+    options "/wiki.cgi"
+    assert_includes(last_response.errors, "OPTIONS /wiki.cgi")
   end
 end

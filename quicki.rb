@@ -13,6 +13,10 @@ class QuickiApp < Sinatra::Base
     enable :logging
   end
 
+  before do
+    logger.info("#{request.request_method} #{request.path_info}?#{request.query_string}")
+  end
+
   get '/*' do
     handle(request)
   end
@@ -33,8 +37,6 @@ class QuickiApp < Sinatra::Base
   def handle(request)
     req = parse_req(request)
     cgi = find_cgi(req[:req_uri])
-
-    logger.info("#{req[:method]} #{req[:req_uri]} -> #{cgi}")
 
     cgi.end_with?(".cgi") ? run_cgi(cgi, req) : serve_static(cgi)
   rescue StandardError => e
