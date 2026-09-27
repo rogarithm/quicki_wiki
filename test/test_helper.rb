@@ -37,8 +37,8 @@ module QuickiTestHelpers
     end
   end
 
-  def in_tmpdir
-    Dir.mktmpdir("quicki-test") do |dir|
+  def in_tmpdir(dirname: "quicki-test")
+    Dir.mktmpdir(dirname) do |dir|
       Dir.chdir(dir) do
         yield dir
       end

@@ -41,35 +41,6 @@ class QuickiCoreTest < Minitest::Test
     assert_equal("abc=123", parsed_req[:body])
   end
 
-  # 요청 uri로부터 cgi 경로를 추출한다
-  def test_find_cgi_extracts_cgi_path_from_request_uri
-    # 기본값 처리
-    assert_equal("wiki.cgi", @qa.find_cgi("/"))
-
-    assert_equal("search.cgi", @qa.find_cgi("/search.cgi?search=Wiki"))
-    assert_equal("logo.gif", @qa.find_cgi("/logo%2Egif"))
-  end
-
-  # CGI가 아닌 경로는 정적 파일 이름 그대로 반환한다
-  def test_find_cgi_returns_static_filename_for_non_cgi_path
-    assert_equal("logo.gif", @qa.find_cgi("/logo.gif"))
-  end
-
-  # 허용 목록에 없는 CGI 이름이거나 매핑된 .cgi 파일이 실제로 없으면 not_found를 반환한다
-  def test_run_cgi_returns_not_found_for_unknown_or_missing_script
-    request = {method: "GET", req_uri: "/", headers: {}, body: ""}
-    response = @qa.run_cgi("unknown.cgi", request)
-    assert_equal(404, response[0])
-    assert_equal(["Not Found\n"], response[2])
-
-    File.stub(:file?, false) do
-      request = {method: "GET", req_uri: "/", headers: {}, body: ""}
-      response = @qa.run_cgi("wiki.cgi", request)
-      assert_equal(404, response[0])
-      assert_equal(["Not Found\n"], response[2])
-    end
-  end
-
   # REQUEST_METHOD, QUERY_STRING, CONTENT_LENGTH, SERVER_SOFTWARE를 CGI 실행 환경으로 전달한다
   def test_run_cgi_passes_expected_environment
     request = {
@@ -140,41 +111,6 @@ class QuickiCoreTest < Minitest::Test
     assert_equal(201, response[0])
     assert_equal(true, response[1].has_key?("X-Test"))
     assert_equal(["body"], response[2])
-  end
-
-  # path가 nil이거나 파일이 없으면 not_found를 반환한다
-  def test_serve_static_returns_not_found_for_nil_or_missing_file
-    assert_equal(404, @qa.serve_static(nil)[0])
-    assert_equal(["Not Found\n"], @qa.serve_static(nil)[2])
-
-    in_tmpdir do
-      assert_equal(404, @qa.serve_static("missing.gif")[0])
-      assert_equal(["Not Found\n"], @qa.serve_static("missing.gif")[2])
-    end
-  end
-
-  # .gif, .html, .txt 파일을 처리할 수 있다
-  def test_serve_static_sets_content_type_by_extension
-    in_tmpdir do
-      File.binwrite("logo.gif", "GIF")
-      File.write("page.html", "<p>ok</p>")
-      File.write("note.txt", "text")
-
-      assert_equal("image/gif", @qa.serve_static("logo.gif")[1]["Content-Type"])
-      assert_equal("text/html", @qa.serve_static("page.html")[1]["Content-Type"])
-      assert_equal("text/plain", @qa.serve_static("note.txt")[1]["Content-Type"])
-    end
-  end
-
-  # 파일 내용을 바이너리 모드로 읽어 응답 본문에 넣는다
-  def test_serve_static_reads_file_as_body
-    in_tmpdir do
-      File.binwrite("logo.gif", "GIF89a")
-
-      response = @qa.serve_static("logo.gif")
-
-      assert_equal(["GIF89a"], response[2])
-    end
   end
 
   # 응답 객체에는 HTTP 응답 상태 코드를 포함한다

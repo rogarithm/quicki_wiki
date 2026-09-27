@@ -18,7 +18,7 @@
 
 ```bash
 bundle install
-bundle exec puma -p 8000
+bundle exec puma
 ```
 
 기본 포트는 `9292`이다. 다른 포트로 실행하려면 포트 번호를 인자로 넘기면 된다.
@@ -52,6 +52,10 @@ WIKI_PASSWORD=very_complex_password
 - 검색: `/search.cgi?search=키워드`
 - 최근 변경 목록: `/changes.cgi`
 - 참조 수 확인: `/refcount.cgi?PageName`
+
+### 정적 파일
+
+이미지 등 정적 자산은 `public/` 디렉터리에서 서빙된다. 위키 문서나 템플릿에서 참조할 이미지를 추가하려면 `public/` 아래에 넣어야 한다.
 
 ### 테스트
 
