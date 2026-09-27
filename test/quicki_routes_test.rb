@@ -50,6 +50,60 @@ class QuickiRoutesTest < Minitest::Test
     assert_equal(405, last_response.status)
   end
 
+  # .gif, .html, .txt 파일을 처리할 수 있다
+  def test_serve_static_sets_content_type_by_extension
+    original = QuickiApp.settings.public_folder
+    in_tmpdir(dirname: "public") do |dir|
+      QuickiApp.set :public_folder, dir
+
+      File.binwrite("logo.gif", "GIF")
+      File.write("page.html", "<p>ok</p>")
+      File.write("note.txt", "text")
+
+      get "/logo.gif"
+      assert_equal(200, last_response.status)
+      assert_equal("image/gif", last_response.headers["content-type"])
+
+      get "/page.html"
+      assert_equal(200, last_response.status)
+      assert_equal("text/html;charset=utf-8", last_response.headers["content-type"])
+
+      get "/note.txt"
+      assert_equal(200, last_response.status)
+      assert_equal("text/plain;charset=utf-8", last_response.headers["content-type"])
+    end
+  ensure
+    QuickiApp.set :public_folder, original
+  end
+
+  # path가 nil이거나 파일이 없으면 not_found를 반환한다
+  def test_serve_static_returns_not_found_for_nil_or_missing_file
+    original = QuickiApp.settings.public_folder
+    in_tmpdir(dirname: "public") do |dir|
+      QuickiApp.set :public_folder, dir
+
+      get "/missing.gif"
+      assert_equal(404, last_response.status)
+    end
+  ensure
+    QuickiApp.set :public_folder, original
+  end
+
+  # 파일 내용을 바이너리 모드로 읽어 응답 본문에 넣는다
+  def test_serve_static_reads_file_as_body
+    original = QuickiApp.settings.public_folder
+    in_tmpdir(dirname: "public") do |dir|
+      QuickiApp.set :public_folder, dir
+
+      File.binwrite("logo.gif", "GIF89a")
+
+      get "/logo.gif"
+      assert_includes(last_response.body, "GIF89a")
+    end
+  ensure
+    QuickiApp.set :public_folder, original
+  end
+
   def test_logging_before_handle_route
     get "/wiki.cgi?Foo"
     assert_includes(last_response.errors, "GET /wiki.cgi?Foo")

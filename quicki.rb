@@ -11,6 +11,8 @@ class QuickiApp < Sinatra::Base
 
   configure do
     enable :logging
+    set :public_folder, File.join(ROOT, "public")
+    set :static, true
   end
 
   before do
@@ -29,10 +31,6 @@ class QuickiApp < Sinatra::Base
 
   get '/' do
     handle('wiki.cgi', request)
-  end
-
-  get '/*' do
-    serve_static(params[:splat].first)
   end
 
   %w[put patch delete options trace connect].map(&:upcase) # verb는 꼭 대문자여야 한다
@@ -120,20 +118,6 @@ class QuickiApp < Sinatra::Base
     end
 
     make_resp(status, header_hash, body: body.nil? ? resp : body)
-  end
-
-  def serve_static(path)
-    return not_found unless path && File.file?(path)
-
-    ext = File.extname(path).downcase
-    type = {
-      ".gif"  => "image/gif",
-      ".html" => "text/html",
-      ".txt"  => "text/plain"
-    }.freeze
-     .fetch(ext, "application/octet-stream")
-    body = File.binread(path)
-    make_resp("200 OK", { "Content-Type" => type }, body: body)
   end
 
   def not_found

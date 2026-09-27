@@ -128,41 +128,6 @@ class QuickiCoreTest < Minitest::Test
     assert_equal(["body"], response[2])
   end
 
-  # path가 nil이거나 파일이 없으면 not_found를 반환한다
-  def test_serve_static_returns_not_found_for_nil_or_missing_file
-    assert_equal(404, @qa.serve_static(nil)[0])
-    assert_equal(["Not Found\n"], @qa.serve_static(nil)[2])
-
-    in_tmpdir do
-      assert_equal(404, @qa.serve_static("missing.gif")[0])
-      assert_equal(["Not Found\n"], @qa.serve_static("missing.gif")[2])
-    end
-  end
-
-  # .gif, .html, .txt 파일을 처리할 수 있다
-  def test_serve_static_sets_content_type_by_extension
-    in_tmpdir do
-      File.binwrite("logo.gif", "GIF")
-      File.write("page.html", "<p>ok</p>")
-      File.write("note.txt", "text")
-
-      assert_equal("image/gif", @qa.serve_static("logo.gif")[1]["Content-Type"])
-      assert_equal("text/html", @qa.serve_static("page.html")[1]["Content-Type"])
-      assert_equal("text/plain", @qa.serve_static("note.txt")[1]["Content-Type"])
-    end
-  end
-
-  # 파일 내용을 바이너리 모드로 읽어 응답 본문에 넣는다
-  def test_serve_static_reads_file_as_body
-    in_tmpdir do
-      File.binwrite("logo.gif", "GIF89a")
-
-      response = @qa.serve_static("logo.gif")
-
-      assert_equal(["GIF89a"], response[2])
-    end
-  end
-
   # 응답 객체에는 HTTP 응답 상태 코드를 포함한다
   def test_make_resp_includes_http_status_line
     response = @qa.make_resp("201 Created", body: "ok")
