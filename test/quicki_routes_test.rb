@@ -21,12 +21,41 @@ class QuickiRoutesTest < Minitest::Test
 
   # GET 요청이 Sinatra 라우트를 거쳐 실제 CGI 디스패치까지 도달한다
   def test_get_dispatches_through_sinatra_route
+    QuickiApp.set :static, false
+
     File.stub(:file?, true) do
       Open3.stub(:capture3, ["Status: 200 OK\n\nhello", "", status_double(true)]) do
         get "/wiki.cgi?Foo"
         assert_equal(200, last_response.status)
       end
     end
+  ensure
+    QuickiApp.set :static, true
+  end
+
+  # 허용 목록에 없는 CGI 이름이면 not_found를 반환한다
+  def test_run_cgi_returns_not_found_for_unknown_or_missing_script
+    QuickiApp.set :static, false
+
+    get "/unknown.cgi"
+    assert_equal(404, last_response.status)
+    assert_equal("text/plain;charset=utf-8", last_response.content_type)
+  ensure
+      QuickiApp.set :static, true
+  end
+
+  # 매핑된 .cgi 파일이 실제로 없으면 not_found를 반환한다
+  def test_run_cgi_returns_not_found_when_backing_script_file_is_missing
+    QuickiApp.set :static, false
+
+    File.stub(:file?, false) do
+      Open3.stub(:capture3, ->(*) { raise "should not be called" }) do
+        get "/wiki.cgi"
+        assert_equal(404, last_response.status)
+      end
+    end
+  ensure
+    QuickiApp.set :static, true
   end
 
   # PUT처럼 등록되지 않은 CGI 관련 메서드는 405를 반환한다

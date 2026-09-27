@@ -47,6 +47,12 @@ class QuickiApp < Sinatra::Base
     body "#{e.class}: #{e.message}\n"
   end
 
+  not_found do
+    status 404
+    content_type "text/plain;charset=utf-8"
+    body "Not Found\n"
+  end
+
   # 원본 accept 루프를 대체하는 Rack 엔트리포인트.
   # method/cgi 판별, 로깅, 디스패치 로직은 원본 loop 내부와 동일하게 유지.
   def handle(cgi, request)
@@ -72,8 +78,11 @@ class QuickiApp < Sinatra::Base
   def run_cgi(script_name, request)
     cgi = CGI_NAMES.find {|name| name == script_name.split('.')[0]}
     cgi_path = cgi.nil? ? "" : "#{cgi}.cgi"
-
-    return not_found if cgi_path.empty? || !File.file?(cgi_path)
+    halt(
+      404,
+      { "Content-Type" => "text/plain;charset=utf-8" },
+      "Not Found\n"
+    ) if !File.file?(cgi_path)
 
     env = {
       "REQUEST_METHOD" => request[:method],
@@ -118,10 +127,6 @@ class QuickiApp < Sinatra::Base
     end
 
     make_resp(status, header_hash, body: body.nil? ? resp : body)
-  end
-
-  def not_found
-    make_resp("404 Not Found", body: "Not Found\n")
   end
 
   def server_error(message)

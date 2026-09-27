@@ -41,21 +41,6 @@ class QuickiCoreTest < Minitest::Test
     assert_equal("abc=123", parsed_req[:body])
   end
 
-  # 허용 목록에 없는 CGI 이름이거나 매핑된 .cgi 파일이 실제로 없으면 not_found를 반환한다
-  def test_run_cgi_returns_not_found_for_unknown_or_missing_script
-    request = {method: "GET", req_uri: "/", headers: {}, body: ""}
-    response = @qa.run_cgi("unknown.cgi", request)
-    assert_equal(404, response[0])
-    assert_equal(["Not Found\n"], response[2])
-
-    File.stub(:file?, false) do
-      request = {method: "GET", req_uri: "/", headers: {}, body: ""}
-      response = @qa.run_cgi("wiki.cgi", request)
-      assert_equal(404, response[0])
-      assert_equal(["Not Found\n"], response[2])
-    end
-  end
-
   # REQUEST_METHOD, QUERY_STRING, CONTENT_LENGTH, SERVER_SOFTWARE를 CGI 실행 환경으로 전달한다
   def test_run_cgi_passes_expected_environment
     request = {
