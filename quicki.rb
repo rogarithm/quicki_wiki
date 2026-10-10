@@ -67,11 +67,14 @@ class QuickiApp < Sinatra::Base
     req_uri = request.path_info
     req_uri += "?#{query}" unless query.empty?
 
+    req_body = request.body
+    req_body&.rewind
+
     {
       method: request.request_method,
       req_uri: req_uri,
       headers: {"referer" => request.referer}.compact,
-      body: request.body&.read.to_s
+      body: req_body&.read.to_s
     }
   end
 

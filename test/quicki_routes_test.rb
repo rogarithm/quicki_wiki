@@ -58,6 +58,25 @@ class QuickiRoutesTest < Minitest::Test
     QuickiApp.set :static, true
   end
 
+  # POST 요청 본문이 Sinatra 라우트를 거쳐 CGI의 표준 입력까지 그대로 전달된다
+  def test_post_body_reaches_cgi_through_sinatra_route
+    env = nil
+
+    File.stub(:file?, true) do
+      Open3.stub(:capture3, lambda { |_env, *_args, **kwargs|
+        env = _env.merge("stdin" => kwargs[:stdin_data])
+        # 저장 후 해당 위키 페이지로 리다이렉션한다
+        ["Status: 302 Found\nLocation: wiki.cgi?TestPage\n\n", "", status_double(true)]
+      }) do
+        post "/save.cgi?TestPage", "Text=hello&mode=edit"
+        assert_equal(302, last_response.status)
+      end
+    end
+
+    assert_equal("Text=hello&mode=edit", env["stdin"])
+    assert_equal("20", env["CONTENT_LENGTH"])
+  end
+
   # PUT처럼 등록되지 않은 CGI 관련 메서드는 405를 반환한다
   def test_put_returns_method_not_allowed
     put "/wiki.cgi"
@@ -187,5 +206,20 @@ class SinatraTest < Minitest::Test
 
     [encoded_route, plain_route].all? {|r| assert_equal(r, encoded_route)}
     assert_equal(plain_route, encoded_route)
+  end
+
+  # 폼 본문이 포함된 요청의 경우, sinatra가 params를 만들면서 폼 본문을 끝까지 읽는다.
+  def test_sinatra_reads_form_body_before_route
+    post "/save.cgi?TestPage", "Text=hello&mode=edit"
+
+    env = last_request.env
+
+    # rack.input의 읽기 위치가 끝에 가 있다
+    assert_equal("Text=hello&mode=edit".bytesize, env["rack.input"].pos)
+    # 읽기 위치를 따로 되돌리지 않으면 rack.input은 빈 문자열로 남아있다
+    assert_equal("", env["rack.input"].read)
+
+    # 읽은 본문은 rack이 env에 파싱해 둔다
+    assert_equal("Text=hello&mode=edit", env["rack.request.form_vars"])
   end
 end
