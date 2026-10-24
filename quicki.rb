@@ -43,13 +43,13 @@ class QuickiApp < Sinatra::Base
   error StandardError do |x|
     e = env['sinatra.error']
     status 500
-    content_type "text/plain; charset=UTF-8"
+    content_type "text/plain;charset=UTF-8"
     body "#{e.class}: #{e.message}\n"
   end
 
   not_found do
     status 404
-    content_type "text/plain;charset=utf-8"
+    content_type "text/plain;charset=UTF-8"
     body "Not Found\n"
   end
 
@@ -73,7 +73,7 @@ class QuickiApp < Sinatra::Base
     cgi_path = cgi.nil? ? "" : "#{cgi}.cgi"
     halt(
       404,
-      { "Content-Type" => "text/plain;charset=utf-8" },
+      { "Content-Type" => "text/plain;charset=UTF-8" },
       "Not Found\n"
     ) if !File.file?(cgi_path)
 
@@ -130,7 +130,7 @@ class QuickiApp < Sinatra::Base
   # 현재 요청의 response 객체에 채운다.
   def make_resp(
     status_line,
-    resp_headers = { "Content-Type" => "text/plain; charset=UTF-8" },
+    resp_headers = { "Content-Type" => "text/plain;charset=UTF-8" },
     body:
   )
     code = status_line.to_s.split(" ", 2).first.to_i
