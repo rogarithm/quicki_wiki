@@ -134,11 +134,7 @@ class QuickiApp < Sinatra::Base
     headers = { "Content-Type" => "text/plain; charset=UTF-8" },
     body:
   )
-    resp_headers = {
-      "Content-Length" => body.bytesize.to_s
-    }.merge(headers)
-
     code = status.to_s.split(" ", 2).first.to_i
-    [code, resp_headers, [body]]
+    [code, headers, [body]]
   end
 end
