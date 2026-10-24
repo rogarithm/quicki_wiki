@@ -53,7 +53,7 @@ class QuickiRoutesTest < Minitest::Test
 
     get "/unknown.cgi"
     assert_equal(404, last_response.status)
-    assert_equal("text/plain;charset=utf-8", last_response.content_type)
+    assert_equal("text/plain;charset=UTF-8", last_response.content_type)
   ensure
       QuickiApp.set :static, true
   end
@@ -191,7 +191,7 @@ class QuickiRoutesTest < Minitest::Test
 
     get "/wiki.cgi?Foo"
     assert_equal 500, last_response.status
-    assert_includes "text/plain; charset=UTF-8", last_response.headers["content-type"]
+    assert_equal("text/plain;charset=UTF-8", last_response.headers["content-type"])
     assert_includes last_response.body, "StandardError: msg"
   ensure
     QuickiApp.define_method(:handle, orig_handle_meth)
