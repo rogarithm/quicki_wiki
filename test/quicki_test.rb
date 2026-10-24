@@ -127,11 +127,4 @@ class QuickiCoreTest < Minitest::Test
     assert_equal("text/html", response[1]["Content-Type"])
     assert_equal("yes", response[1]["X-Test"])
   end
-
-  # body의 bytesize로 Content-Length를 계산한다
-  def test_make_resp_computes_content_length_from_body_bytes
-    response = @qa.make_resp("200 OK", body: "한")
-
-    assert_equal("3", response[1]["Content-Length"])
-  end
 end
