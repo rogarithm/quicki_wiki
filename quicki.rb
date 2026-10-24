@@ -126,15 +126,16 @@ class QuickiApp < Sinatra::Base
     make_resp("500 Internal Server Error", body: message)
   end
 
-  # 원본은 raw HTTP 텍스트("HTTP/1.0 ...")를 문자열로 조립했지만,
-  # Puma/Rack은 [status:Integer, headers:Hash, body:Enumerable] 3-tuple을 요구하므로
-  # 여기서만 조립 방식을 바꾼다. status/header 병합 로직 자체는 원본과 동일.
+  # 응답 상태, 헤더, 본문을 sinatra 헬퍼(Sinatra::Helpers의 status/headers/body)로
+  # 현재 요청의 response 객체에 채운다.
   def make_resp(
-    status,
-    headers = { "Content-Type" => "text/plain; charset=UTF-8" },
+    status_line,
+    resp_headers = { "Content-Type" => "text/plain; charset=UTF-8" },
     body:
   )
-    code = status.to_s.split(" ", 2).first.to_i
-    [code, headers, [body]]
+    code = status_line.to_s.split(" ", 2).first.to_i
+    status(code)
+    headers(resp_headers)
+    body(body) # 키워드 인자 body가 헬퍼 이름을 가리므로, 괄호를 붙여 메서드 호출로 해석되게 한다
   end
 end

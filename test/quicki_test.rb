@@ -3,6 +3,9 @@ require_relative "test_helper"
 class QuickiCoreTest < Minitest::Test
   def setup
     @qa = QuickiApp.new!
+    # make_resp가 쓰는 sinatra 헬퍼는 call!이 요청마다 만드는 request, response 객체를 필요로 한다
+    @qa.request = Sinatra::Request.new(Rack::MockRequest.env_for("/"))
+    @qa.response = Sinatra::Response.new
   end
 
   # 다음 시나리오는 이제 QuickiApp의 책임이 아니라 Puma/Rack이 보장한다:
@@ -50,7 +53,8 @@ class QuickiCoreTest < Minitest::Test
       captured_env = env.merge("stdin" => kwargs[:stdin_data], "chdir" => kwargs[:chdir])
       ["Status: 201 Created\nX-Test: yes\n\nok", "", status_double(true)]
     }) do
-      response = @qa.run_cgi("save.cgi", request, "abc=123")
+      @qa.run_cgi("save.cgi", request, "abc=123")
+      response = @qa.response.finish
 
       assert_equal(201, response[0])
     end
@@ -69,7 +73,8 @@ class QuickiCoreTest < Minitest::Test
     File.stub(:file?, true) do
       Open3.stub(:capture3, ["Status: 202 Accepted\nX-Test: yes\n\nbody", "", status_double(true)]) do
         request = Rack::Request.new(Rack::MockRequest.env_for("/wiki.cgi?Foo"))
-        response = @qa.run_cgi("wiki.cgi", request, "")
+        @qa.run_cgi("wiki.cgi", request, "")
+        response = @qa.response.finish
 
         assert_equal(202, response[0])
         assert_equal(true, response[1].has_key?("X-Test"))
@@ -83,7 +88,8 @@ class QuickiCoreTest < Minitest::Test
     File.stub(:file?, true) do
       Open3.stub(:capture3, ["", "boom", status_double(false)]) do
         request = Rack::Request.new(Rack::MockRequest.env_for("/wiki.cgi?Foo"))
-        response = @qa.run_cgi("wiki.cgi", request, "")
+        @qa.run_cgi("wiki.cgi", request, "")
+        response = @qa.response.finish
 
         assert_equal(500, response[0])
         assert_equal(true, response[1].has_key?("Content-Type"))
@@ -94,7 +100,8 @@ class QuickiCoreTest < Minitest::Test
 
   # 헤더와 본문 구분이 없으면 전체 출력을 200 OK 본문으로 감싼다
   def test_parse_cgi_out_wraps_headerless_output
-    response = @qa.parse_cgi_out("plain body only")
+    @qa.parse_cgi_out("plain body only")
+    response = @qa.response.finish
 
     assert_equal(200, response[0])
     assert_equal(["plain body only"], response[2])
@@ -102,7 +109,8 @@ class QuickiCoreTest < Minitest::Test
 
   # Status 헤더가 있으면 HTTP 상태줄로 사용하고, 그 외의 헤더는 응답 헤더로 유지한다
   def test_parse_cgi_out_uses_status_header_and_preserves_other_headers
-    response = @qa.parse_cgi_out("Status: 201 Created\r\nX-Test: yes\r\n\r\nbody")
+    @qa.parse_cgi_out("Status: 201 Created\r\nX-Test: yes\r\n\r\nbody")
+    response = @qa.response.finish
 
     assert_equal(201, response[0])
     assert_equal(true, response[1].has_key?("X-Test"))
@@ -111,18 +119,20 @@ class QuickiCoreTest < Minitest::Test
 
   # 응답 객체에는 HTTP 응답 상태 코드를 포함한다
   def test_make_resp_includes_http_status_line
-    response = @qa.make_resp("201 Created", body: "ok")
+    @qa.make_resp("201 Created", body: "ok")
+    response = @qa.response.finish
 
     assert_equal(201, response[0])
   end
 
   # 호출자가 넘긴 헤더를 응답에 병합한다
   def test_make_resp_merges_headers_sent_by_client
-    response = @qa.make_resp(
+    @qa.make_resp(
       "200 OK",
       {"Content-Type" => "text/html", "X-Test" => "yes"},
       body: "ok"
     )
+    response = @qa.response.finish
 
     assert_equal("text/html", response[1]["Content-Type"])
     assert_equal("yes", response[1]["X-Test"])
