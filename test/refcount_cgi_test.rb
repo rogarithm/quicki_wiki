@@ -16,8 +16,8 @@ class RefcountCgiTest < Minitest::Test
         File.binwrite(doc, "WikiWord")
       end
 
-      out, _err = with_env("QUERY_STRING" => "") do
-        capture_io { @counter.handle_req }
+      out = with_env("QUERY_STRING" => "") do
+        @counter.handle_req(nil, nil)
       end
 
       assert_includes(out, "WikiWord")

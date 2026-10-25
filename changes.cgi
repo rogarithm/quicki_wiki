@@ -5,7 +5,7 @@ module Quicki
     LINK = /\A[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]+)+\z/
     MONTHS = %w[January February March April May June July August September October November December]
 
-    def handle_req
+    def handle_req(env, _stdin)
       # 최근 날짜가 앞에 오도록 파일을 정렬한다
       dated_pages = Dir.children("pages")
                        .select { |name| name.match?(LINK) }
@@ -14,7 +14,7 @@ module Quicki
                        .reverse
 
       # 최대로 보여 줄 파일 갯수
-      max = ENV.fetch("QUERY_STRING", "")[/\bmax=(\d+)/, 1]
+      max = env.fetch("QUERY_STRING", "")[/\bmax=(\d+)/, 1]
       max = max ? max.to_i : 25
 
       par = {}
@@ -28,9 +28,7 @@ module Quicki
         par.fetch(m, "") # 결과 중 par에 저장된 값이 있으면 템플릿에 값을 채운다
       end
 
-      $stdout.sync = true
-      print "Content-type: text/html; charset=UTF-8\n\n"
-      print template
+      "Content-type: text/html; charset=UTF-8\n\n" + template
     end
 
     def gen_body(dated_pages, max)
@@ -54,5 +52,5 @@ module Quicki
 end
 
 if $PROGRAM_NAME == __FILE__
-  Quicki::ChangeViewer.new.handle_req
+  print Quicki::ChangeViewer.new.handle_req(ENV, STDIN)
 end

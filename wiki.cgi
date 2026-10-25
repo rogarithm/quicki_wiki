@@ -8,11 +8,8 @@ module Quicki
     INTERNAL_CGI = /(changes|refcount)\.cgi/
     MONTHS = %w[January February March April May June July August September October November December]
 
-    def handle_req
-      $stdout.sync = true
-      print "Content-type: text/html; charset=UTF-8\n\n"
-
-      page = ENV.fetch("QUERY_STRING", "")[/\A(#{LINK})\z/, 1] || "WelcomeVisitors"
+    def handle_req(env, _stdin)
+      page = env.fetch("QUERY_STRING", "")[/\A(#{LINK})\z/, 1] || "WelcomeVisitors"
 
       par = {}
       par["page"] = page
@@ -39,7 +36,7 @@ module Quicki
 
       template = File.binread("template.html")
       template.gsub!(/\$(\w+)/) { par.fetch(Regexp.last_match(1), "") }
-      print template
+      "Content-type: text/html; charset=UTF-8\n\n" + template
     end
 
     def render_wiki_doc(source)
@@ -206,5 +203,5 @@ module Quicki
 end
 
 if $PROGRAM_NAME == __FILE__
-  Quicki::Browser.new.handle_req
+  print Quicki::Browser.new.handle_req(ENV, STDIN)
 end

@@ -13,8 +13,8 @@ class WikiBrowserTest < Minitest::Test
         File.binwrite(doc, "Welcome body")
       end
 
-      out, _err = with_env("QUERY_STRING" => "") do
-        capture_io { @browser.handle_req }
+      out = with_env("QUERY_STRING" => "") do
+        @browser.handle_req(ENV, nil)
       end
 
       assert_match("Welcome Visitors", out)
@@ -30,8 +30,8 @@ class WikiBrowserTest < Minitest::Test
         File.binwrite(doc, "Page body")
       end
 
-      out, _err = with_env("QUERY_STRING" => "WikiWord") do
-        capture_io { @browser.handle_req }
+      out = with_env("QUERY_STRING" => "WikiWord") do
+        @browser.handle_req(ENV, nil)
       end
 
       assert_match("Wiki Word", out)
@@ -44,8 +44,8 @@ class WikiBrowserTest < Minitest::Test
     in_tmpdir do
       write_template
 
-      out, _err = with_env("QUERY_STRING" => "MissingPage") do
-        capture_io { @browser.handle_req }
+      out = with_env("QUERY_STRING" => "MissingPage") do
+        @browser.handle_req(ENV, nil)
       end
 
       assert_match(/"MissingPage" does not yet exist/, out)

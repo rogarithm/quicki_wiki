@@ -17,7 +17,7 @@ class ChangesCgiTest < Minitest::Test
         File.binwrite(doc, "skip")
       end
 
-      out, _err = capture_io { @viewer.handle_req }
+      out = @viewer.handle_req(ENV, nil)
 
       assert_includes(out, "WikiWord")
       refute_includes(out, "not-a-wiki")
@@ -37,7 +37,7 @@ class ChangesCgiTest < Minitest::Test
         File.utime(Time.utc(2024, 1, 2), Time.utc(2024, 1, 2), doc)
       end
 
-      out, _err = capture_io { @viewer.handle_req }
+      out = @viewer.handle_req(ENV, nil)
 
       assert_operator(out.index("NewPage"), :<, out.index("OldPage"))
     end
@@ -54,8 +54,8 @@ class ChangesCgiTest < Minitest::Test
         File.binwrite(doc, "2")
       end
 
-      out, _err = with_env("QUERY_STRING" => "max=1") do
-        capture_io { @viewer.handle_req }
+      out = with_env("QUERY_STRING" => "max=1") do
+        @viewer.handle_req(ENV, nil)
       end
 
       assert_equal(1, out.scan(/<dd><a href=wiki.cgi\?/).length)
@@ -70,7 +70,7 @@ class ChangesCgiTest < Minitest::Test
         File.binwrite(doc, "body")
       end
 
-      out, _err = capture_io { @viewer.handle_req }
+      out = @viewer.handle_req(ENV, nil)
 
       assert_includes(out, "TITLE:Recent Changes")
       assert_includes(out, "PAGE:changes.cgi")

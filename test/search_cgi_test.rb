@@ -13,8 +13,8 @@ class SearchCgiTest < Minitest::Test
         File.binwrite(doc, "Wiki body")
       end
 
-      out, _err = with_env("QUERY_STRING" => "search=Wiki") do
-        capture_io { @searcher.handle_req }
+      out = with_env("QUERY_STRING" => "search=Wiki") do
+        @searcher.handle_req(ENV, nil)
       end
 
       assert_includes(out, "value=\"Wiki\"")
@@ -29,8 +29,8 @@ class SearchCgiTest < Minitest::Test
         File.binwrite(doc, "wiki.org/path")
       end
 
-      out, _err = with_env("QUERY_STRING" => "search=wiki.org%2Fpath") do
-        capture_io { @searcher.handle_req }
+      out = with_env("QUERY_STRING" => "search=wiki.org%2Fpath") do
+        @searcher.handle_req(ENV, nil)
       end
 
       assert_includes(out, "value=\"wiki.org/path\"")
@@ -48,8 +48,8 @@ class SearchCgiTest < Minitest::Test
         File.binwrite(doc, "Wiki body")
       end
 
-      out, _err = with_env("QUERY_STRING" => "search=Wiki") do
-        capture_io { @searcher.handle_req }
+      out = with_env("QUERY_STRING" => "search=Wiki") do
+        @searcher.handle_req(ENV, nil)
       end
 
       assert_includes(out, "1 pages found out of 1 pages searched.")
@@ -67,8 +67,8 @@ class SearchCgiTest < Minitest::Test
         File.binwrite(doc, "No match")
       end
 
-      out, _err = with_env("QUERY_STRING" => "search=Wiki") do
-        capture_io { @searcher.handle_req }
+      out = with_env("QUERY_STRING" => "search=Wiki") do
+        @searcher.handle_req(ENV, nil)
       end
 
       assert_includes(out, "1 pages found out of 2 pages searched.")
@@ -83,8 +83,8 @@ class SearchCgiTest < Minitest::Test
         File.binwrite(doc, "Wiki body")
       end
 
-      out, _err = with_env("QUERY_STRING" => "search=NoSuchNeedle") do
-        capture_io { @searcher.handle_req }
+      out = with_env("QUERY_STRING" => "search=NoSuchNeedle") do
+        @searcher.handle_req(ENV, nil)
       end
 
       assert_includes(out, "No pages found out of 1 pages searched.")
@@ -99,8 +99,8 @@ class SearchCgiTest < Minitest::Test
         File.binwrite(doc, "Wiki body")
       end
 
-      out, _err = with_env("QUERY_STRING" => "search=Wiki") do
-        capture_io { @searcher.handle_req }
+      out = with_env("QUERY_STRING" => "search=Wiki") do
+        @searcher.handle_req(ENV, nil)
       end
 
       assert_includes(out, "TITLE:Search Results")
