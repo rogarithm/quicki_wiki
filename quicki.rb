@@ -2,12 +2,21 @@
 
 require 'sinatra/base'
 require 'cgi'
-require 'open3'
-require 'rbconfig'
+require 'stringio'
 
 class QuickiApp < Sinatra::Base
   ROOT = File.expand_path(__dir__)
   CGI_NAMES = %w[wiki edit save search changes refcount].freeze
+  CGI_NAMES.each { |name| load File.join(ROOT, "#{name}.cgi") }
+  # 요청을 처리할 CGI 클래스
+  HANDLERS = {
+    "wiki"     => Quicki::Browser,
+    "edit"     => Quicki::Editor,
+    "save"     => Quicki::Writer,
+    "search"   => Quicki::Searcher,
+    "changes"  => Quicki::ChangeViewer,
+    "refcount" => Quicki::BacklinkCounter
+  }.freeze
 
   configure do
     enable :logging
@@ -70,12 +79,11 @@ class QuickiApp < Sinatra::Base
 
   def run_cgi(script_name, request, req_body)
     cgi = CGI_NAMES.find {|name| name == script_name.split('.')[0]}
-    cgi_path = cgi.nil? ? "" : "#{cgi}.cgi"
     halt(
       404,
       { "Content-Type" => "text/plain;charset=UTF-8" },
       "Not Found\n"
-    ) if !File.file?(cgi_path)
+    ) if cgi.nil?
 
     env = {
       "REQUEST_METHOD" => request.request_method,
@@ -86,20 +94,14 @@ class QuickiApp < Sinatra::Base
     referer = request.referer
     env["HTTP_REFERER"] = referer if referer
 
-    resp, stderr, status = Open3.capture3(
-      env,
-      RbConfig.ruby,
-      cgi_path,
-      stdin_data: req_body,
-      chdir: ROOT,
-      unsetenv_others: false
-    )
-
-    if status.success?
-      parse_cgi_out(resp)
-    else
-      server_error("CGI failed for #{script_name}\n#{stderr}")
+    begin
+      resp = HANDLERS.fetch(cgi).new.handle_req(env, StringIO.new(req_body))
+    rescue StandardError => e
+      # CGI 프로세스가 실패했을 때 stderr에 찍히던 내용(메시지와 backtrace)을 응답 본문에 담는다
+      return server_error("CGI failed for #{script_name}\n#{e.full_message(highlight: false)}")
     end
+
+    parse_cgi_out(resp)
   end
 
   def parse_cgi_out(resp)

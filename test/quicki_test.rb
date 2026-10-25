@@ -41,7 +41,7 @@ class QuickiCoreTest < Minitest::Test
     assert_equal("abc=123", req_body)
   end
 
-  # REQUEST_METHOD, QUERY_STRING, CONTENT_LENGTH, SERVER_SOFTWARE를 CGI 실행 환경으로 전달한다
+  # REQUEST_METHOD, QUERY_STRING, CONTENT_LENGTH, SERVER_SOFTWARE를 env로, 요청 본문을 stdin으로 CGI에 전달한다
   def test_run_cgi_passes_expected_environment
     request = Rack::Request.new(Rack::MockRequest.env_for(
       "/save.cgi?PageName",
@@ -49,14 +49,17 @@ class QuickiCoreTest < Minitest::Test
       "HTTP_REFERER" => "http://example.test/from"
     ))
     captured_env = nil
-    Open3.stub(:capture3, lambda { |env, *_args, **kwargs|
-      captured_env = env.merge("stdin" => kwargs[:stdin_data], "chdir" => kwargs[:chdir])
-      ["Status: 201 Created\nX-Test: yes\n\nok", "", status_double(true)]
+    writer = Quicki::Writer.new
+    writer.stub(:handle_req, lambda { |env, stdin|
+      captured_env = env.merge("stdin" => stdin.read)
+      "Status: 201 Created\nX-Test: yes\n\nok"
     }) do
-      @qa.run_cgi("save.cgi", request, "abc=123")
-      response = @qa.response.finish
+      Quicki::Writer.stub(:new, writer) do
+        @qa.run_cgi("save.cgi", request, "abc=123")
+        response = @qa.response.finish
 
-      assert_equal(201, response[0])
+        assert_equal(201, response[0])
+      end
     end
 
     assert_equal("POST", captured_env["REQUEST_METHOD"])
@@ -65,13 +68,13 @@ class QuickiCoreTest < Minitest::Test
     assert_equal("QuickiRuby", captured_env["SERVER_SOFTWARE"])
     assert_equal("http://example.test/from", captured_env["HTTP_REFERER"])
     assert_equal("abc=123", captured_env["stdin"])
-    assert_equal(TEST_ROOT, captured_env["chdir"])
   end
 
   # CGI 실행이 성공하면 parse_cgi_out으로 응답을 해석한다
   def test_run_cgi_parses_successful_output
-    File.stub(:file?, true) do
-      Open3.stub(:capture3, ["Status: 202 Accepted\nX-Test: yes\n\nbody", "", status_double(true)]) do
+    browser = Quicki::Browser.new
+    browser.stub(:handle_req, "Status: 202 Accepted\nX-Test: yes\n\nbody") do
+      Quicki::Browser.stub(:new, browser) do
         request = Rack::Request.new(Rack::MockRequest.env_for("/wiki.cgi?Foo"))
         @qa.run_cgi("wiki.cgi", request, "")
         response = @qa.response.finish
@@ -83,17 +86,19 @@ class QuickiCoreTest < Minitest::Test
     end
   end
 
-  # CGI 실행이 실패하면 stderr 내용을 포함한 server_error를 반환한다
+  # CGI 실행 중 예외가 나면 예외 메시지를 포함한 server_error를 반환한다
   def test_run_cgi_returns_server_error_when_cgi_fails
-    File.stub(:file?, true) do
-      Open3.stub(:capture3, ["", "boom", status_double(false)]) do
+    browser = Quicki::Browser.new
+    browser.stub(:handle_req, ->(*) { raise "boom" }) do
+      Quicki::Browser.stub(:new, browser) do
         request = Rack::Request.new(Rack::MockRequest.env_for("/wiki.cgi?Foo"))
         @qa.run_cgi("wiki.cgi", request, "")
         response = @qa.response.finish
 
         assert_equal(500, response[0])
         assert_equal(true, response[1].has_key?("Content-Type"))
-        assert_equal(["CGI failed for wiki.cgi\nboom"], response[2])
+        assert(response[2].first.start_with?("CGI failed for wiki.cgi\n"))
+        assert_includes(response[2].first, "boom (RuntimeError)")
       end
     end
   end
