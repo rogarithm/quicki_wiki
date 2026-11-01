@@ -33,13 +33,27 @@ class QuickiRoutesTest < Minitest::Test
     QuickiApp.set :static, true
   end
 
+  # Content-Length는 sinatra(Sinatra::Response#finish)가 CGI 응답 본문의 bytesize로 계산한다
+  def test_content_length_is_computed_by_sinatra
+    QuickiApp.set :static, false
+
+    File.stub(:file?, true) do
+      Open3.stub(:capture3, ["Content-type: text/html; charset=UTF-8\n\n한", "", status_double(true)]) do
+        get "/wiki.cgi?Foo"
+        assert_equal("3", last_response.headers["content-length"])
+      end
+    end
+  ensure
+    QuickiApp.set :static, true
+  end
+
   # 허용 목록에 없는 CGI 이름이면 not_found를 반환한다
   def test_run_cgi_returns_not_found_for_unknown_or_missing_script
     QuickiApp.set :static, false
 
     get "/unknown.cgi"
     assert_equal(404, last_response.status)
-    assert_equal("text/plain;charset=utf-8", last_response.content_type)
+    assert_equal("text/plain;charset=UTF-8", last_response.content_type)
   ensure
       QuickiApp.set :static, true
   end
@@ -177,7 +191,7 @@ class QuickiRoutesTest < Minitest::Test
 
     get "/wiki.cgi?Foo"
     assert_equal 500, last_response.status
-    assert_includes "text/plain; charset=UTF-8", last_response.headers["content-type"]
+    assert_equal("text/plain;charset=UTF-8", last_response.headers["content-type"])
     assert_includes last_response.body, "StandardError: msg"
   ensure
     QuickiApp.define_method(:handle, orig_handle_meth)
