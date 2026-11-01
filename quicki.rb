@@ -56,29 +56,19 @@ class QuickiApp < Sinatra::Base
   # 원본 accept 루프를 대체하는 Rack 엔트리포인트.
   # method/cgi 판별, 로깅, 디스패치 로직은 원본 loop 내부와 동일하게 유지.
   def handle(cgi, request)
-    req = parse_req(request)
-    run_cgi(cgi, req)
+    req_body = parse_req(request)
+    run_cgi(cgi, request, req_body)
   end
 
-  # 기존 parse_req(소켓에서 직접 읽던 부분)를 Rack env 기반으로 대체.
-  # 반환 형태는 원본 parse_req와 동일하게 맞춰서 이후 로직을 그대로 재사용한다.
+  # method, query, referer 등은 sinatra request에서 바로 꺼내 쓰므로, 요청 본문만 계산해 돌려준다.
+  # sinatra는 라우트 실행 전에 params를 만들면서 폼 본문을 끝까지 읽으므로, 되감은 뒤 읽는다.
   def parse_req(request)
-    query = request.query_string
-    req_uri = request.path_info
-    req_uri += "?#{query}" unless query.empty?
-
     req_body = request.body
     req_body&.rewind
-
-    {
-      method: request.request_method,
-      req_uri: req_uri,
-      headers: {"referer" => request.referer}.compact,
-      body: req_body&.read.to_s
-    }
+    req_body&.read.to_s
   end
 
-  def run_cgi(script_name, request)
+  def run_cgi(script_name, request, req_body)
     cgi = CGI_NAMES.find {|name| name == script_name.split('.')[0]}
     cgi_path = cgi.nil? ? "" : "#{cgi}.cgi"
     halt(
@@ -88,19 +78,19 @@ class QuickiApp < Sinatra::Base
     ) if !File.file?(cgi_path)
 
     env = {
-      "REQUEST_METHOD" => request[:method],
-      "QUERY_STRING" => request[:req_uri].split("?", 2)[1].to_s,
-      "CONTENT_LENGTH" => request[:body].bytesize.to_s,
+      "REQUEST_METHOD" => request.request_method,
+      "QUERY_STRING" => request.query_string,
+      "CONTENT_LENGTH" => req_body.bytesize.to_s,
       "SERVER_SOFTWARE" => "QuickiRuby"
     }
-    referer = request[:headers]["referer"]
+    referer = request.referer
     env["HTTP_REFERER"] = referer if referer
 
     resp, stderr, status = Open3.capture3(
       env,
       RbConfig.ruby,
       cgi_path,
-      stdin_data: request[:body],
+      stdin_data: req_body,
       chdir: ROOT,
       unsetenv_others: false
     )

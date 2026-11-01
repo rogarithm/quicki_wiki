@@ -10,7 +10,7 @@ class QuickiCoreTest < Minitest::Test
   # - 빈 줄을 만나면 헤더 파싱을 멈추고 이후를 body로 처리 (rack에서 처리)
   # - 요청 라인에 method 또는 req_uri가 없는 경우 처리 (rack에서 처리)
 
-  # GET 요청으로 받은 env로부터 method, req_uri, headers, 빈 body를 올바르게 파싱한다
+  # GET 요청은 본문이 없으므로 빈 문자열을 반환한다
   def test_parse_req_parses_get_request
     env = Rack::MockRequest.env_for(
       "/wiki.cgi?Foo",
@@ -19,12 +19,9 @@ class QuickiCoreTest < Minitest::Test
     )
     req = Rack::Request.new(env)
 
-    parsed_req = @qa.parse_req(req)
+    req_body = @qa.parse_req(req)
 
-    assert_equal("GET", parsed_req[:method])
-    assert_equal("/wiki.cgi?Foo", parsed_req[:req_uri])
-    assert_equal("here", parsed_req[:headers]["referer"])
-    assert_equal("", parsed_req[:body])
+    assert_equal("", req_body)
   end
 
   # POST 요청의 body는 rack.input에 담긴다
@@ -36,25 +33,24 @@ class QuickiCoreTest < Minitest::Test
     )
     req = Rack::Request.new(env)
 
-    parsed_req = @qa.parse_req(req)
+    req_body = @qa.parse_req(req)
 
-    assert_equal("abc=123", parsed_req[:body])
+    assert_equal("abc=123", req_body)
   end
 
   # REQUEST_METHOD, QUERY_STRING, CONTENT_LENGTH, SERVER_SOFTWARE를 CGI 실행 환경으로 전달한다
   def test_run_cgi_passes_expected_environment
-    request = {
+    request = Rack::Request.new(Rack::MockRequest.env_for(
+      "/save.cgi?PageName",
       method: "POST",
-      req_uri: "/save.cgi?PageName",
-      headers: {"referer" => "http://example.test/from"},
-      body: "abc=123"
-    }
+      "HTTP_REFERER" => "http://example.test/from"
+    ))
     captured_env = nil
     Open3.stub(:capture3, lambda { |env, *_args, **kwargs|
       captured_env = env.merge("stdin" => kwargs[:stdin_data], "chdir" => kwargs[:chdir])
       ["Status: 201 Created\nX-Test: yes\n\nok", "", status_double(true)]
     }) do
-      response = @qa.run_cgi("save.cgi", request)
+      response = @qa.run_cgi("save.cgi", request, "abc=123")
 
       assert_equal(201, response[0])
     end
@@ -72,8 +68,8 @@ class QuickiCoreTest < Minitest::Test
   def test_run_cgi_parses_successful_output
     File.stub(:file?, true) do
       Open3.stub(:capture3, ["Status: 202 Accepted\nX-Test: yes\n\nbody", "", status_double(true)]) do
-        request = {method: "GET", req_uri: "/wiki.cgi?Foo", headers: {}, body: ""}
-        response = @qa.run_cgi("wiki.cgi", request)
+        request = Rack::Request.new(Rack::MockRequest.env_for("/wiki.cgi?Foo"))
+        response = @qa.run_cgi("wiki.cgi", request, "")
 
         assert_equal(202, response[0])
         assert_equal(true, response[1].has_key?("X-Test"))
@@ -86,8 +82,8 @@ class QuickiCoreTest < Minitest::Test
   def test_run_cgi_returns_server_error_when_cgi_fails
     File.stub(:file?, true) do
       Open3.stub(:capture3, ["", "boom", status_double(false)]) do
-        request = {method: "GET", req_uri: "/wiki.cgi?Foo", headers: {}, body: ""}
-        response = @qa.run_cgi("wiki.cgi", request)
+        request = Rack::Request.new(Rack::MockRequest.env_for("/wiki.cgi?Foo"))
+        response = @qa.run_cgi("wiki.cgi", request, "")
 
         assert_equal(500, response[0])
         assert_equal(true, response[1].has_key?("Content-Type"))
