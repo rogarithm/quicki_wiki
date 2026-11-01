@@ -23,8 +23,9 @@ class QuickiRoutesTest < Minitest::Test
   def test_get_dispatches_through_sinatra_route
     QuickiApp.set :static, false
 
-    File.stub(:file?, true) do
-      Open3.stub(:capture3, ["Status: 200 OK\n\nhello", "", status_double(true)]) do
+    browser = Quicki::Browser.new
+    browser.stub(:handle_req, "Status: 200 OK\n\nhello") do
+      Quicki::Browser.stub(:new, browser) do
         get "/wiki.cgi?Foo"
         assert_equal(200, last_response.status)
       end
@@ -37,8 +38,9 @@ class QuickiRoutesTest < Minitest::Test
   def test_content_length_is_computed_by_sinatra
     QuickiApp.set :static, false
 
-    File.stub(:file?, true) do
-      Open3.stub(:capture3, ["Content-type: text/html; charset=UTF-8\n\n한", "", status_double(true)]) do
+    browser = Quicki::Browser.new
+    browser.stub(:handle_req, "Content-type: text/html; charset=UTF-8\n\n한") do
+      Quicki::Browser.stub(:new, browser) do
         get "/wiki.cgi?Foo"
         assert_equal("3", last_response.headers["content-length"])
       end
@@ -58,30 +60,17 @@ class QuickiRoutesTest < Minitest::Test
       QuickiApp.set :static, true
   end
 
-  # 매핑된 .cgi 파일이 실제로 없으면 not_found를 반환한다
-  def test_run_cgi_returns_not_found_when_backing_script_file_is_missing
-    QuickiApp.set :static, false
-
-    File.stub(:file?, false) do
-      Open3.stub(:capture3, ->(*) { raise "should not be called" }) do
-        get "/wiki.cgi"
-        assert_equal(404, last_response.status)
-      end
-    end
-  ensure
-    QuickiApp.set :static, true
-  end
-
   # POST 요청 본문이 Sinatra 라우트를 거쳐 CGI의 표준 입력까지 그대로 전달된다
   def test_post_body_reaches_cgi_through_sinatra_route
     env = nil
 
-    File.stub(:file?, true) do
-      Open3.stub(:capture3, lambda { |_env, *_args, **kwargs|
-        env = _env.merge("stdin" => kwargs[:stdin_data])
-        # 저장 후 해당 위키 페이지로 리다이렉션한다
-        ["Status: 302 Found\nLocation: wiki.cgi?TestPage\n\n", "", status_double(true)]
-      }) do
+    writer = Quicki::Writer.new
+    writer.stub(:handle_req, lambda { |_env, stdin|
+      env = _env.merge("stdin" => stdin.read)
+      # 저장 후 해당 위키 페이지로 리다이렉션한다
+      "Status: 302 Found\nLocation: wiki.cgi?TestPage\n\n"
+    }) do
+      Quicki::Writer.stub(:new, writer) do
         post "/save.cgi?TestPage", "Text=hello&mode=edit"
         assert_equal(302, last_response.status)
       end

@@ -5,9 +5,9 @@ module Quicki
     LINK = /[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]+)+/
     MARK = "\uE000"
 
-    def handle_req
-      page = ENV.fetch("QUERY_STRING", "")[LINK] || "WelcomeVisitors"
-      input = STDIN.read(ENV.fetch("CONTENT_LENGTH", "0").to_i)
+    def handle_req(env, stdin)
+      page = env.fetch("QUERY_STRING", "")[LINK] || "WelcomeVisitors"
+      input = stdin.read(env.fetch("CONTENT_LENGTH", "0").to_i)
       page_path = File.join("pages", page)
       source = File.exist?(page_path) ? File.binread(page_path) : nil
 
@@ -37,9 +37,7 @@ module Quicki
         par.fetch(m, "") # 결과 중 par에 저장된 값이 있으면 템플릿에 값을 채운다
       end
 
-      $stdout.sync = true
-      print "Content-type: text/html; charset=UTF-8\n\n"
-      print template
+      "Content-type: text/html; charset=UTF-8\n\n" + template
     end
 
     def gen_body(source)
@@ -53,5 +51,5 @@ module Quicki
 end
 
 if $PROGRAM_NAME == __FILE__
-  Quicki::Editor.new.handle_req
+  print Quicki::Editor.new.handle_req(ENV, STDIN)
 end

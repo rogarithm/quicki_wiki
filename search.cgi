@@ -4,8 +4,8 @@ module Quicki
   class Searcher
     LINK = /\A[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]+)+\z/
 
-    def handle_req
-      target = ENV.fetch("QUERY_STRING", "")[/search=([^&]*)/, 1] # [] 두번째 인자인 1은 ()로 캡쳐한 값만 가져온다
+    def handle_req(env, _stdin)
+      target = env.fetch("QUERY_STRING", "")[/search=([^&]*)/, 1] # [] 두번째 인자인 1은 ()로 캡쳐한 값만 가져온다
                  .to_s
       target = target.gsub("+", " ").gsub(/%(..)/) do
         m = Regexp.last_match(1)
@@ -31,9 +31,7 @@ module Quicki
       template = File.binread("template.html")
       template.gsub!(/\$(\w+)/) { par.fetch(Regexp.last_match(1), "") }
 
-      $stdout.sync = true
-      print "Content-type: text/html; charset=UTF-8\n\n"
-      print template
+      "Content-type: text/html; charset=UTF-8\n\n" + template
     end
 
     def count_hits(regex, pages)
@@ -76,5 +74,5 @@ FORM
 end
 
 if $PROGRAM_NAME == __FILE__
-  Quicki::Searcher.new.handle_req
+  print Quicki::Searcher.new.handle_req(ENV, STDIN)
 end

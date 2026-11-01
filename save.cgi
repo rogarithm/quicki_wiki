@@ -5,16 +5,15 @@ module Quicki
     MARK = "\uE000"
     LINK = /[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]+)+/
 
-    def handle_req
-      page = ENV.fetch("QUERY_STRING", "")[/\A#{LINK}\z/]
+    def handle_req(env, stdin)
+      page = env.fetch("QUERY_STRING", "")[/\A#{LINK}\z/]
       raise "BadSaveName\n" unless page
 
-      input = STDIN.read(ENV.fetch("CONTENT_LENGTH", "0").to_i)
+      input = stdin.read(env.fetch("CONTENT_LENGTH", "0").to_i)
       body = gen_body(input)
 
       text, backlink_target, mode = gen_text(body)
 
-      $stdout.sync = true
       if backlink_target
         File.open(File.join("pages", backlink_target), "a") do |file|
           file.write("\n----\n#{page}")
@@ -25,8 +24,8 @@ module Quicki
         file.write(text)
       end
 
-      print "Status: 302 Found\n"
-      print "Location: wiki.cgi?#{page}\n\n"
+      "Status: 302 Found\n" \
+        "Location: wiki.cgi?#{page}\n\n"
     end
 
     def gen_body(input)
@@ -77,5 +76,5 @@ module Quicki
 end
 
 if $PROGRAM_NAME == __FILE__
-  Quicki::Writer.new.handle_req
+  print Quicki::Writer.new.handle_req(ENV, STDIN)
 end

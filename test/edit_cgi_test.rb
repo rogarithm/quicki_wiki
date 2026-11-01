@@ -14,7 +14,7 @@ class EditCgiTest < Minitest::Test
       end
 
       out, _err = with_env("QUERY_STRING" => "not-valid") do
-        capture_with_stdin { @editor.handle_req }
+        capture_with_stdin { print @editor.handle_req(ENV, STDIN) }
       end
 
       assert_match("Edit WelcomeVisitors", out)
@@ -30,13 +30,13 @@ class EditCgiTest < Minitest::Test
       end
 
       out, _err = with_env("QUERY_STRING" => "WelcomeVisitors") do
-        capture_with_stdin { @editor.handle_req }
+        capture_with_stdin { print @editor.handle_req(ENV, STDIN) }
       end
       assert_match(/<textarea[^>]*>A&amp;B<\/textarea>/, out)
 
       # 없는 페이지이므로 본문도 비어있어야 한다
       out, _err = with_env("QUERY_STRING" => "MissingPage") do
-        capture_with_stdin { @editor.handle_req }
+        capture_with_stdin { print @editor.handle_req(ENV, STDIN) }
       end
       assert_match(/<textarea[^>]*><\/textarea>/, out)
     end
@@ -51,7 +51,7 @@ class EditCgiTest < Minitest::Test
       end
 
       out, _err = with_env("QUERY_STRING" => "GuestBook", "CONTENT_LENGTH" => "8") do
-        capture_with_stdin("append=1") { @editor.handle_req }
+        capture_with_stdin("append=1") { print @editor.handle_req(ENV, STDIN) }
       end
 
       assert_match(/Add comment to .+/, out)
@@ -69,7 +69,7 @@ class EditCgiTest < Minitest::Test
       end
 
       out, _err = with_env("QUERY_STRING" => "WelcomeVisitors") do
-        capture_with_stdin { @editor.handle_req }
+        capture_with_stdin { print @editor.handle_req(ENV, STDIN) }
       end
 
       assert_includes(out, "TITLE:Edit WelcomeVisitors")

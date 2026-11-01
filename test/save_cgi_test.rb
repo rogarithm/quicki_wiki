@@ -9,7 +9,7 @@ class SaveCgiTest < Minitest::Test
   def test_handle_req_raises_for_invalid_query_string
     err = with_env("QUERY_STRING" => "invalid-name") do
       assert_raises(RuntimeError) do
-        @writer.handle_req
+        @writer.handle_req(ENV, STDIN)
       end
     end
 
@@ -29,7 +29,7 @@ class SaveCgiTest < Minitest::Test
         {"Text" => "saved", "mode" => "edit"}
       }) do
         with_env("QUERY_STRING" => "SavePage", "CONTENT_LENGTH" => "4") do
-          capture_with_stdin("1234ignored") { @writer.handle_req }
+          capture_with_stdin("1234ignored") { @writer.handle_req(ENV, STDIN) }
         end
       end
 
@@ -48,7 +48,7 @@ class SaveCgiTest < Minitest::Test
       end
 
       with_env("QUERY_STRING" => "SaveBacklink", "CONTENT_LENGTH" => "34") do
-        capture_with_stdin("Text=Before+%3C%3CMainTopic&mode=edit") { @writer.handle_req }
+        capture_with_stdin("Text=Before+%3C%3CMainTopic&mode=edit") { @writer.handle_req(ENV, STDIN) }
       end
 
       assert_equal("topic\n----\nSaveBacklink", File.binread("pages/MainTopic"))
@@ -63,7 +63,7 @@ class SaveCgiTest < Minitest::Test
       end
 
       out, _err = with_env("QUERY_STRING" => "SavePage", "CONTENT_LENGTH" => "20") do
-        capture_with_stdin("Text=hello&mode=edit") { @writer.handle_req }
+        capture_with_stdin("Text=hello&mode=edit") { print @writer.handle_req(ENV, STDIN) }
       end
 
       assert_equal("Status: 302 Found\nLocation: wiki.cgi?SavePage\n\n", out)

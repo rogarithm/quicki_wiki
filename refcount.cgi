@@ -5,7 +5,7 @@ module Quicki
   class BacklinkCounter
     LINK = /[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]+)+/
 
-    def handle_req
+    def handle_req(_env, _stdin)
       files = Dir.children("pages").select { |name| name.match?(/\A#{LINK}\z/) }
       # 파일명=>파일 내용 형식의 해시를 만든다
       pages = load_pages(files)
@@ -22,9 +22,7 @@ module Quicki
         par.fetch(m, "") # 결과 중 par에 저장된 값이 있으면 템플릿에 값을 채운다
       end
 
-      $stdout.sync = true
-      print "Content-type: text/html; charset=UTF-8\n\n"
-      print template
+      "Content-type: text/html; charset=UTF-8\n\n" + template
     end
 
     def load_pages(files)
@@ -72,5 +70,5 @@ module Quicki
 end
 
 if $PROGRAM_NAME == __FILE__
-  Quicki::BacklinkCounter.new.handle_req
+  print Quicki::BacklinkCounter.new.handle_req(ENV, STDIN)
 end
